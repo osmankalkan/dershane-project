@@ -6,8 +6,6 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy.orm import Session
-
 from app.models.result import Result
 from app.repositories.student_repository import SQLAlchemyRepository
 

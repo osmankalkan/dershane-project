@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 136
+
+[tool.ruff.lint]
+select = [
+    "E",  # Standart stil hataları
+    "F",  # Mantık ve syntax hataları
+    "I"   # Importların otomatik alfabetik sıralanması (isort)
+]
+

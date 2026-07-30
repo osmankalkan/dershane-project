@@ -15,7 +15,6 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import Uuid
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
@@ -23,10 +22,10 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
-    UniqueConstraint,
+    Uuid,
 )
-from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import JSON
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
 

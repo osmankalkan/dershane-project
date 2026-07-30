@@ -11,8 +11,7 @@ Genişleme notu (mimari-sablon.md §12):
 
 import uuid
 
-from sqlalchemy import ForeignKey, String, UniqueConstraint
-from sqlalchemy import Uuid
+from sqlalchemy import ForeignKey, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin

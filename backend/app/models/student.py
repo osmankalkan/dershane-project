@@ -11,8 +11,7 @@ Not: student_code sınav raporlarındaki öğrenci kimliğidir;
 import uuid
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String, UniqueConstraint
-from sqlalchemy import Uuid
+from sqlalchemy import ForeignKey, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin

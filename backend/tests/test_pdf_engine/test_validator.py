@@ -21,7 +21,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from app.pdf_engine.validator import ValidationError, validate_result_counts
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Yardımcı sabitler
 # ─────────────────────────────────────────────────────────────────────────────

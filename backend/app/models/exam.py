@@ -14,8 +14,7 @@ Veri hiyerarşisi:
 import uuid
 from typing import Optional
 
-from sqlalchemy import Date, ForeignKey, String, Text, UniqueConstraint
-from sqlalchemy import Uuid
+from sqlalchemy import Date, ForeignKey, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin

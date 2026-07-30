@@ -12,8 +12,7 @@ Güvenlik notu (mimari-sablon.md §10):
 import uuid
 from typing import Optional
 
-from sqlalchemy import Boolean, ForeignKey, String
-from sqlalchemy import Uuid
+from sqlalchemy import Boolean, ForeignKey, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
