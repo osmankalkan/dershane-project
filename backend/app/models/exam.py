@@ -15,7 +15,7 @@ import uuid
 from typing import Optional
 
 from sqlalchemy import Date, ForeignKey, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -51,7 +51,7 @@ class Topic(UUIDMixin, Base):
     )
 
     subject_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("subjects.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -74,7 +74,7 @@ class LearningOutcome(UUIDMixin, Base):
     __tablename__ = "learning_outcomes"
 
     topic_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("topics.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -99,12 +99,12 @@ class Exam(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "exams"
 
     institution_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("institutions.id", ondelete="RESTRICT"),
         nullable=False,
     )
     raw_file_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("raw_files.id", ondelete="SET NULL"),
         nullable=True,
         # Manuel girişlerde kaynak PDF olmayabilir.

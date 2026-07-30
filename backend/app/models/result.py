@@ -31,7 +31,7 @@ from sqlalchemy import (
     SmallInteger,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -63,17 +63,17 @@ class Result(UUIDMixin, TimestampMixin, Base):
 
     # ── Dış anahtarlar ────────────────────────────────────────────────────────
     student_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("students.id", ondelete="RESTRICT"),
         nullable=False,
     )
     exam_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("exams.id", ondelete="RESTRICT"),
         nullable=False,
     )
     learning_outcome_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("learning_outcomes.id", ondelete="RESTRICT"),
         nullable=False,
     )

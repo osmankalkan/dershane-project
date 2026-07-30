@@ -76,18 +76,21 @@ Bu prensipler projenin temel kurallarıdır. Teknik karar verirken her zaman bu 
 
 ### 2.1 Backend
 
-| Bileşen | Teknoloji | Versiyon | Gerekçe |
+> **Faz 0 (Local MVP) ile Faz 1+ arasındaki fark bu tabloda gösterilmiştir.**
+> Mimari değişmez; yalnızca bağımlılıklar yerini tutar. Geçiş sıfır iş mantığı değişikliği gerektirir.
+
+| Bileşen | Faz 0 — Local MVP | Faz 1+ — Kurumsal | Gerekçe / ADR |
 |---|---|---|---|
-| Web Framework | **FastAPI** | >= 0.111 | Async destek, otomatik OpenAPI dokümantasyonu, Pydantic entegrasyonu |
-| ORM | **SQLAlchemy** | >= 2.0 | Async destekli, güçlü migration ekosistemi |
-| Migration | **Alembic** | >= 1.13 | SQLAlchemy ile entegre, versiyon kontrolü |
-| Veritabanı | **PostgreSQL** | >= 16 | ACID garantisi, JSON sütun desteği, ölçeklenebilirlik |
-| Validation | **Pydantic v2** | >= 2.7 | Tip güvenliği, performans |
-| PDF İşleme | **pdfplumber** | >= 0.11 | Tablo çıkarma, metin konumlandırma |
-| OCR (Fallback) | **pytesseract** | >= 0.3 | Taranmış PDF'ler için |
-| Auth | **PyJWT + bcrypt** | — | JWT token yönetimi |
-| Task Queue | **Celery + Redis** | — | Uzun süren PDF işlemleri için asenkron kuyruk |
-| Container | **Docker + Compose** | — | Ortam tutarlılığı |
+| Web Framework | **FastAPI** >= 0.111 | **FastAPI** >= 0.111 | Async destek, OpenAPI — değişmez |
+| ORM | **SQLAlchemy** >= 2.0 | **SQLAlchemy** >= 2.0 | Repository pattern; DB'den bağımsız — değişmez |
+| Veritabanı | **SQLite** (yerel dosya) | **PostgreSQL** >= 16 | ADR-005: URL swap = sıfır kod değişikliği |
+| Migration | *(Alembic — Faz 1)* | **Alembic** >= 1.13 | MVP'de tablo `create_all` ile oluşturulur |
+| Validation | **Pydantic v2** >= 2.7 | **Pydantic v2** >= 2.7 | Değişmez |
+| Task Queue | **FastAPI BackgroundTasks** | **Celery + Redis** | ADR-006: `AbstractTaskRunner` swap edilir |
+| Auth | ~~iptal~~ *(Faz 0'da yok)* | **PyJWT + bcrypt** | ADR-007: Dikey dilim önceliği |
+| PDF İşleme | **pdfplumber** >= 0.11 | **pdfplumber** >= 0.11 | Değişmez |
+| OCR (Fallback) | **pytesseract** >= 0.3 | **pytesseract** >= 0.3 | Değişmez |
+| Container | *(yok — yerel çalışır)* | **Docker + Compose** | MVP'de gereksiz |
 
 ### 2.2 Frontend
 
@@ -744,22 +747,54 @@ dershane-project/
 
 ## 13. Geliştirme Fazları
 
-### Faz 1 — Temel Altyapı
+### Faz 0 — Local MVP ⬅ ŞU AN BURADASIN
 
-- [ ] PostgreSQL şema kurulumu (Alembic migration'larla)
-- [ ] `core/config.py`, `core/database.py` kurulumu
-- [ ] `models/` katmanı (tüm tablolar)
-- [ ] `base_parser.py` arayüzü + `parser_yayinevi_a.py` (ilk format)
-- [ ] `validator.py` + birim testleri
+> **Strateji:** Dikey dilim (vertical slice). Auth, Docker, Celery yok.
+> Tek amaç: PDF yükle → parse et → SQLite'a yaz → ekranda göster.
+> Tüm soyutlamalar yerli yerinde; ileride hiçbir iş mantığı değişmez.
+
+**Kapsam dışı (kasıtlı olarak ertelendi):**
+- ❌ Auth / JWT / RBAC (ADR-007)
+- ❌ Celery + Redis (ADR-006 ile BackgroundTasks ile soyutlandı)
+- ❌ Docker / PostgreSQL (ADR-005 ile SQLite kullanılıyor)
+- ❌ review_queue onay ekranı
+- ❌ Multi-tenant / kurum yönetimi
+
+**Tamamlanacak işler:**
+- [x] `base_parser.py` soyut arayüzü
+- [x] `validator.py` + testleri
+- [x] SQLAlchemy modelleri (`models/`)
+- [ ] `core/config.py` — Pydantic Settings, `DATABASE_URL=sqlite:///./dershane.db`
+- [ ] `core/database.py` — SQLAlchemy engine + session factory (DB-agnostic)
+- [ ] `repositories/base_repository.py` — Generic soyut repository
+- [ ] `repositories/student_repository.py` — SQLAlchemy implementasyonu
+- [ ] `repositories/exam_repository.py`
+- [ ] `repositories/result_repository.py`
+- [ ] `tasks/base_task.py` — `AbstractTaskRunner` arayüzü
+- [ ] `tasks/background_task_runner.py` — FastAPI `BackgroundTasks` implementasyonu
+- [ ] `api/v1/upload.py` — PDF yükleme endpoint'i (auth yok)
+- [ ] `api/v1/students.py` — Öğrenci listeleme (auth yok)
+- [ ] `api/v1/exams.py` — Sınav listeleme (auth yok)
+- [ ] `app/main.py` — FastAPI app, tablo create_all, CORS
+- [ ] `parser_yayinevi_a.py` — İlk gerçek parser implementasyonu
+- [ ] Manuel test: PDF yükle, DB'de gör, API'den oku
+
+---
+
+### Faz 1 — Altyapı Geçişi (SQLite → PostgreSQL + Auth)
+
+- [ ] `DATABASE_URL` ortam değişkeni ile PostgreSQL'e geçiş (kod değişmez)
+- [ ] Alembic migration kurulumu
+- [ ] Auth servis ve endpoint'leri (PyJWT + bcrypt)
+- [ ] JWT middleware — tüm endpoint'lere eklenir
 - [ ] Docker Compose (postgres + redis + backend)
+- [ ] `AbstractTaskRunner` → Celery implementasyonuyla swap
 
-### Faz 2 — Backend API
+### Faz 2 — Backend API (Tam)
 
-- [ ] Auth endpoints (register, login, token refresh)
-- [ ] Upload endpoint + Celery task entegrasyonu
-- [ ] Students CRUD endpoint'leri
-- [ ] Exams endpoint'leri
 - [ ] Review queue endpoint'leri
+- [ ] Students / Exams tam CRUD
+- [ ] Analytics endpoint'leri
 
 ### Faz 3 — Temel Frontend
 
@@ -825,6 +860,30 @@ dershane-project/
 **Tarih:** Proje başlangıcı
 **Karar:** `results` tablosunda `measured BOOLEAN` alanı zorunludur.
 **Gerekçe:** Bir öğrencinin bir kazanımda 0 doğru yapması ile o kazanımın sınavda ölçülmemesi (soru bulunmaması) arasındaki fark veri bütünlüğü açısından kritiktir. Bu farkı NULL ile değil, semantik `measured=false` ile ifade etmek gerekir.
+
+---
+
+### ADR-005: Local MVP'de SQLite Kullanımı
+
+**Tarih:** Faz 0 başlangıcı  
+**Karar:** Faz 0'da PostgreSQL yerine SQLite kullanılır.  
+**Gerekçe:** Kurulum sıfır bağımlılık; tek dosya, tek kullanıcı, offline çalışır. Geçiş için tek değişiklik `DATABASE_URL` ortam değişkenidir. Repository pattern sayesinde servis katmanı hangi DB'nin kullanıldığını bilmez (P4 prensibi).
+
+---
+
+### ADR-006: BackgroundTasks → Celery Geçiş Stratejisi
+
+**Tarih:** Faz 0 başlangıcı  
+**Karar:** Faz 0'da Celery + Redis kurulmaz. Tüm asenkron işler `AbstractTaskRunner` arayüzü üzerinden çalışır. Faz 0 implementasyonu FastAPI `BackgroundTasks`'tır.  
+**Gerekçe:** Celery kurulumu ciddi bir operasyonel yük getirir (Redis, worker process, monitoring). Tek kullanıcılı yerel senaryoda gereksizdir. `AbstractTaskRunner.run()` imzası sabit tutulduğu için Faz 1'de Celery implementasyonu sadece `__init__.py`'de config değişikliğiyle swap edilir; iş mantığına dokunulmaz.
+
+---
+
+### ADR-007: Faz 0'da Auth İptali
+
+**Tarih:** Faz 0 başlangıcı  
+**Karar:** Faz 0'da kimlik doğrulama (JWT, RBAC, login) tamamen devre dışı bırakılır.  
+**Gerekçe:** Uygulama internete kapalı, tek kullanıcılı bir ortamda çalışacak. Auth'u şimdi eklemek dikey dilimi geciktirir ve somut değer üretmez. Tüm endpoint'ler auth olmadan çalışır. Faz 1'de middleware olarak eklenir; mevcut endpoint kodlarına dokunulmaz.
 
 ---
 

@@ -12,7 +12,7 @@ Genişleme notu (mimari-sablon.md §12):
 import uuid
 
 from sqlalchemy import ForeignKey, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -58,7 +58,7 @@ class Class(UUIDMixin, TimestampMixin, Base):
     )
 
     institution_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("institutions.id", ondelete="RESTRICT"),
         nullable=False,
     )

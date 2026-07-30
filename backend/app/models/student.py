@@ -12,7 +12,7 @@ import uuid
 from typing import Optional
 
 from sqlalchemy import ForeignKey, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -33,7 +33,7 @@ class Student(UUIDMixin, TimestampMixin, Base):
     )
 
     class_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("classes.id", ondelete="RESTRICT"),
         nullable=False,
     )

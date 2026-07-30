@@ -13,8 +13,9 @@ Neden bu kadar katman? (mimari-sablon.md §5.1)
 
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
+from sqlalchemy import Uuid
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
@@ -24,7 +25,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
+from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -58,7 +59,7 @@ class RawFile(UUIDMixin, Base):
     )
 
     institution_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("institutions.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -77,7 +78,7 @@ class RawFile(UUIDMixin, Base):
     )
 
     uploaded_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -114,7 +115,7 @@ class RawExtraction(UUIDMixin, Base):
     __tablename__ = "raw_extractions"
 
     raw_file_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("raw_files.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -122,18 +123,19 @@ class RawExtraction(UUIDMixin, Base):
     # Örn. "YAYINEVI_A_V1" — hangi parser ürettiği izlenebilir.
 
     detected_format: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    raw_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    raw_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     # Parser'ın normalleştirilmemiş ham çıktısı.
+    # SQLite: JSON string olarak saklanır; PostgreSQL: native JSONB.
+    # Sorgulama ihtiyacı doğarsa PostgreSQL'e geçişte JSONB'ye migrate edilir.
 
     confidence: Mapped[Optional[float]] = mapped_column(
         Numeric(3, 2), nullable=True
     )
     # 0.00 – 1.00; detector'ın format eşleşme güveni.
 
-    warnings: Mapped[Optional[list[str]]] = mapped_column(
-        ARRAY(Text), nullable=True
-    )
-    # Engelleyici olmayan uyarı mesajları.
+    warnings: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Engelleyici olmayan uyarı mesajları (str listesi).
+    # SQLite: JSON array string; PostgreSQL: native ARRAY(Text).
 
     extracted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
@@ -174,7 +176,7 @@ class ReviewQueue(UUIDMixin, TimestampMixin, Base):
     )
 
     raw_extraction_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("raw_extractions.id", ondelete="RESTRICT"),
         nullable=False,
     )
@@ -189,7 +191,7 @@ class ReviewQueue(UUIDMixin, TimestampMixin, Base):
     )
 
     resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )

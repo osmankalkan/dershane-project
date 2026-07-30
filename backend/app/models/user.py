@@ -13,7 +13,7 @@ import uuid
 from typing import Optional
 
 from sqlalchemy import Boolean, ForeignKey, String
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -25,7 +25,7 @@ class User(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "users"
 
     institution_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid(),
         ForeignKey("institutions.id", ondelete="SET NULL"),
         nullable=True,
     )
