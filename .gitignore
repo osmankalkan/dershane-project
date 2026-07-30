@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Environment — ASLA commit'leme
+.env
+**/.env
+.env.local
+
+# Node
+node_modules/
+.env.local
+
+# Uploads (ham PDF'ler)
+backend/uploads/
+
+# Docker
+docker-compose.override.yml
+postgres_data/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
