@@ -32,9 +32,7 @@ from typing import Any
 
 # ── Özel hata sınıfı ─────────────────────────────────────────────────────────
 
-REQUIRED_KEYS: frozenset[str] = frozenset(
-    {"correct", "wrong", "blank", "total_expected"}
-)
+REQUIRED_KEYS: frozenset[str] = frozenset({"correct", "wrong", "blank", "total_expected"})
 
 
 class ValidationError(Exception):
@@ -58,13 +56,11 @@ class ValidationError(Exception):
         self.context = context or {}
 
     def __repr__(self) -> str:
-        return (
-            f"ValidationError(field={self.field!r}, "
-            f"message={self.message!r}, context={self.context})"
-        )
+        return f"ValidationError(field={self.field!r}, message={self.message!r}, context={self.context})"
 
 
 # ── Yardımcı: tek alan doğrulama ─────────────────────────────────────────────
+
 
 def _to_int(value: Any, field: str) -> int:
     """Değeri int'e çevirir; başarısız olursa ValidationError fırlatır."""
@@ -86,6 +82,7 @@ def _to_int(value: Any, field: str) -> int:
 
 
 # ── Ana doğrulama fonksiyonu ──────────────────────────────────────────────────
+
 
 def validate_result_counts(
     data: dict[str, Any],
@@ -136,17 +133,14 @@ def validate_result_counts(
 
     # R4 — Tip dönüşümü (hatalı tipte ise ValidationError fırlatır)
     correct = _to_int(data["correct"], "correct")
-    wrong   = _to_int(data["wrong"],   "wrong")
-    blank   = _to_int(data["blank"],   "blank")
-    total   = _to_int(data["total_expected"], "total_expected")
+    wrong = _to_int(data["wrong"], "wrong")
+    blank = _to_int(data["blank"], "blank")
+    total = _to_int(data["total_expected"], "total_expected")
 
     # R3 — Toplam pozitif olmalı
     if total <= 0:
         raise ValidationError(
-            message=(
-                f"'total_expected' sıfırdan büyük olmalıdır, "
-                f"alınan: {total}"
-            ),
+            message=(f"'total_expected' sıfırdan büyük olmalıdır, alınan: {total}"),
             field="total_expected",
             context={"received": total},
         )
@@ -154,15 +148,12 @@ def validate_result_counts(
     # R2 — Negatif değer kontrolü
     for field_name, field_val in (
         ("correct", correct),
-        ("wrong",   wrong),
-        ("blank",   blank),
+        ("wrong", wrong),
+        ("blank", blank),
     ):
         if field_val < 0:
             raise ValidationError(
-                message=(
-                    f"'{field_name}' negatif olamaz, "
-                    f"alınan: {field_val}"
-                ),
+                message=(f"'{field_name}' negatif olamaz, alınan: {field_val}"),
                 field=field_name,
                 context={"received": field_val},
             )
@@ -179,11 +170,11 @@ def validate_result_counts(
                 ),
                 field=None,
                 context={
-                    "correct":        correct,
-                    "wrong":          wrong,
-                    "blank":          blank,
-                    "actual_sum":     actual_sum,
+                    "correct": correct,
+                    "wrong": wrong,
+                    "blank": blank,
+                    "actual_sum": actual_sum,
                     "total_expected": total,
-                    "difference":     actual_sum - total,
+                    "difference": actual_sum - total,
                 },
             )

@@ -27,9 +27,7 @@ class Institution(UUIDMixin, TimestampMixin, Base):
     # URL dostu tanımlayıcı; örn. "bilgi-koleji-ankara"
 
     # ── İlişkiler ─────────────────────────────────────────────────────────────
-    classes: Mapped[list["Class"]] = relationship(
-        back_populates="institution", cascade="all, delete-orphan"
-    )
+    classes: Mapped[list["Class"]] = relationship(back_populates="institution", cascade="all, delete-orphan")
     users: Mapped[list["User"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
         back_populates="institution"
     )
@@ -51,7 +49,9 @@ class Class(UUIDMixin, TimestampMixin, Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "institution_id", "name", "academic_year",
+            "institution_id",
+            "name",
+            "academic_year",
             name="uq_class_institution_name_year",
         ),
     )

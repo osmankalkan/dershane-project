@@ -37,10 +37,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_TITLE,
     version=settings.APP_VERSION,
-    description=(
-        "Öğrenci sınav performans analitik platformu. "
-        "Faz 0 — Local MVP (Auth devre dışı, SQLite)."
-    ),
+    description=("Öğrenci sınav performans analitik platformu. Faz 0 — Local MVP (Auth devre dışı, SQLite)."),
     lifespan=lifespan,
 )
 

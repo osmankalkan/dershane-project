@@ -1,26 +1,25 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# requirements.txt — Faz 0 (Local MVP)
+#
+# Faz 0'da OLMAYAN (kasıtlı):
+#   - celery, redis      → Faz 1'de AbstractTaskRunner swap'ı (ADR-006)
+#   - asyncpg            → Faz 1'de PostgreSQL geçişinde eklenir (ADR-005)
+#   - alembic            → Faz 1'de migration yönetimi için eklenir
+#   - PyJWT, bcrypt      → Faz 1'de auth aktif edilince eklenir (ADR-007)
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Web framework
 fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9      # Form ve dosya upload için
 
-# Veritabanı
-sqlalchemy[asyncio]>=2.0.0
-alembic>=1.13.0
-asyncpg>=0.29.0
+# Veritabanı (Faz 0: senkron SQLAlchemy + SQLite — kurulum gerektirmez)
+sqlalchemy>=2.0.0
 
 # Validation
 pydantic>=2.7.0
 pydantic-settings>=2.2.0
 
-# Auth
-PyJWT>=2.8.0
-bcrypt>=4.1.0
-python-multipart>=0.0.9
-
-# PDF
+# PDF işleme
 pdfplumber>=0.11.0
-pytesseract>=0.3.10
-Pillow>=10.0.0
-
-# Task queue
-celery>=5.3.0
-redis>=5.0.0
+Pillow>=10.0.0               # pdfplumber bağımlılığı

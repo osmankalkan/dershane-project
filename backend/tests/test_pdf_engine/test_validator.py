@@ -29,7 +29,7 @@ VALID_DATA: dict = {
     "correct": 7,
     "wrong": 2,
     "blank": 1,
-    "total_expected": 10,   # 7 + 2 + 1 = 10 ✓
+    "total_expected": 10,  # 7 + 2 + 1 = 10 ✓
 }
 
 
@@ -42,8 +42,8 @@ def _make(**overrides) -> dict:
 # R1 — Sayı tutarlılığı: correct + wrong + blank == total_expected
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestR1CountConsistency:
 
+class TestR1CountConsistency:
     def test_valid_counts_pass(self) -> None:
         """Geçerli veri — hata fırlatılmamalı."""
         validate_result_counts(VALID_DATA)  # exception yok
@@ -55,8 +55,8 @@ class TestR1CountConsistency:
         with pytest.raises(ValidationError) as exc_info:
             validate_result_counts(data)
         err = exc_info.value
-        assert "11" in err.message          # bulunan toplam
-        assert "10" in err.message          # beklenen total
+        assert "11" in err.message  # bulunan toplam
+        assert "10" in err.message  # beklenen total
         assert err.context["actual_sum"] == 11
         assert err.context["total_expected"] == 10
         assert err.context["difference"] == 1
@@ -96,10 +96,10 @@ class TestR1CountConsistency:
         with pytest.raises(ValidationError) as exc_info:
             validate_result_counts(data)
         msg = exc_info.value.message
-        assert "5" in msg   # correct
-        assert "3" in msg   # wrong
-        assert "1" in msg   # blank
-        assert "9" in msg   # actual_sum
+        assert "5" in msg  # correct
+        assert "3" in msg  # wrong
+        assert "1" in msg  # blank
+        assert "9" in msg  # actual_sum
         assert "10" in msg  # total_expected
 
 
@@ -107,8 +107,8 @@ class TestR1CountConsistency:
 # R2 — Negatif değer yasak
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestR2NoNegatives:
 
+class TestR2NoNegatives:
     def test_negative_correct_raises(self) -> None:
         data = _make(correct=-1, wrong=5, blank=5, total_expected=10)
         with pytest.raises(ValidationError) as exc_info:
@@ -139,8 +139,8 @@ class TestR2NoNegatives:
 # R3 — total_expected sıfırdan büyük olmalı
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestR3TotalPositive:
 
+class TestR3TotalPositive:
     def test_zero_total_raises(self) -> None:
         data = _make(correct=0, wrong=0, blank=0, total_expected=0)
         with pytest.raises(ValidationError) as exc_info:
@@ -163,8 +163,8 @@ class TestR3TotalPositive:
 # R4 — Tip güvenliği
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestR4TypeSafety:
 
+class TestR4TypeSafety:
     def test_string_digits_are_coerced(self) -> None:
         """Rakam string'leri int'e dönüştürülebilir — geçerli."""
         data = _make(correct="7", wrong="2", blank="1", total_expected="10")
@@ -205,8 +205,8 @@ class TestR4TypeSafety:
 # R5 — Zorunlu anahtarlar
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestR5RequiredKeys:
 
+class TestR5RequiredKeys:
     def test_missing_correct_raises(self) -> None:
         data = {k: v for k, v in VALID_DATA.items() if k != "correct"}
         with pytest.raises(ValidationError) as exc_info:
@@ -235,6 +235,7 @@ class TestR5RequiredKeys:
 # ─────────────────────────────────────────────────────────────────────────────
 # measured=False bypass — ADR-004
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestMeasuredFalseBypass:
     """measured=False olduğunda R1 atlanmalıdır.
@@ -279,8 +280,8 @@ class TestMeasuredFalseBypass:
 # ValidationError yapısı
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestValidationErrorStructure:
 
+class TestValidationErrorStructure:
     def test_error_has_message_attribute(self) -> None:
         data = _make(correct=99)
         with pytest.raises(ValidationError) as exc_info:

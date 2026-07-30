@@ -16,6 +16,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 class Base(DeclarativeBase):
     """Proje genelinde tek DeclarativeBase."""
+
     pass
 
 

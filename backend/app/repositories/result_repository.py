@@ -21,19 +21,11 @@ class ResultRepository(SQLAlchemyRepository[Result]):
 
     def list_by_student(self, student_id: uuid.UUID) -> list[Result]:
         """Bir öğrencinin tüm sınav sonuçlarını döndürür."""
-        return (
-            self._db.query(Result)
-            .filter(Result.student_id == student_id)
-            .all()
-        )
+        return self._db.query(Result).filter(Result.student_id == student_id).all()
 
     def list_by_exam(self, exam_id: uuid.UUID) -> list[Result]:
         """Bir sınavdaki tüm öğrenci sonuçlarını döndürür."""
-        return (
-            self._db.query(Result)
-            .filter(Result.exam_id == exam_id)
-            .all()
-        )
+        return self._db.query(Result).filter(Result.exam_id == exam_id).all()
 
     def get_by_student_exam_outcome(
         self,

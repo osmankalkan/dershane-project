@@ -1,15 +1,36 @@
 repos:
   - repo: local
     hooks:
-      - id: ruff
-        name: ruff linter
-        entry: ruff check --fix --config backend/pyproject.toml
+      # ── 1. ruff format — kod formatını otomatik düzeltir ──────────────────
+      - id: ruff-format
+        name: "ruff: format"
+        entry: ruff format backend/
         language: system
         types: [python]
-        require_serial: true
-      - id: pytest-check
-        name: pytest
-        entry: bash -c "cd backend && pytest"
+        pass_filenames: false
+
+      # ── 2. ruff check — lint kurallarını uygular, düzeltilebilenleri fix eder
+      - id: ruff-check
+        name: "ruff: lint + fix"
+        entry: ruff check --fix --config backend/pyproject.toml backend/
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      # ── 3. Mimari sınır testleri — katman ihlali varsa commit engellenir ──
+      #    Sadece Python dosyası değiştiğinde çalışır; hızlıdır (<1s).
+      - id: architecture-tests
+        name: "test: katman sınırları"
+        entry: bash -c "cd backend && python -m pytest tests/test_architecture.py -q --tb=short"
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      # ── 4. Tüm testler — sadece test/ veya app/ dosyası değişince çalışır ─
+      #    always_run: false → hızlı commit'leri yavaşlatmaz
+      - id: pytest
+        name: "test: tüm suite"
+        entry: bash -c "cd backend && python -m pytest -q --tb=short"
         language: system
         pass_filenames: false
-        always_run: true
+        files: ^backend/(app|tests)/.*\.py$

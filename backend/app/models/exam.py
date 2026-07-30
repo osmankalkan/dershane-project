@@ -32,9 +32,7 @@ class Subject(UUIDMixin, Base):
     # Örn. "MAT", "TRK" — grafik etiketlerinde kullanılır
 
     # ── İlişkiler ─────────────────────────────────────────────────────────────
-    topics: Mapped[list["Topic"]] = relationship(
-        back_populates="subject", cascade="all, delete-orphan"
-    )
+    topics: Mapped[list["Topic"]] = relationship(back_populates="subject", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Subject id={self.id} code={self.short_code!r}>"
@@ -45,9 +43,7 @@ class Topic(UUIDMixin, Base):
 
     __tablename__ = "topics"
 
-    __table_args__ = (
-        UniqueConstraint("subject_id", "name", name="uq_topic_subject_name"),
-    )
+    __table_args__ = (UniqueConstraint("subject_id", "name", name="uq_topic_subject_name"),)
 
     subject_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(),
@@ -59,9 +55,7 @@ class Topic(UUIDMixin, Base):
 
     # ── İlişkiler ─────────────────────────────────────────────────────────────
     subject: Mapped["Subject"] = relationship(back_populates="topics")
-    learning_outcomes: Mapped[list["LearningOutcome"]] = relationship(
-        back_populates="topic", cascade="all, delete-orphan"
-    )
+    learning_outcomes: Mapped[list["LearningOutcome"]] = relationship(back_populates="topic", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Topic id={self.id} name={self.name!r}>"

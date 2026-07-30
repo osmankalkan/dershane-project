@@ -72,18 +72,14 @@ class RawFile(UUIDMixin, Base):
     file_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     # SHA-256; aynı PDF'in iki kez yüklenmesini önler.
 
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default=RawFileStatus.PENDING
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default=RawFileStatus.PENDING)
 
     uploaded_by: Mapped[uuid.UUID] = mapped_column(
         Uuid(),
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    uploaded_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     # ── İlişkiler ─────────────────────────────────────────────────────────────
     institution: Mapped["Institution"] = relationship(  # type: ignore[name-defined]  # noqa: F821
@@ -93,9 +89,7 @@ class RawFile(UUIDMixin, Base):
         back_populates="uploaded_files",
         foreign_keys=[uploaded_by],
     )
-    extractions: Mapped[list["RawExtraction"]] = relationship(
-        back_populates="raw_file", cascade="all, delete-orphan"
-    )
+    extractions: Mapped[list["RawExtraction"]] = relationship(back_populates="raw_file", cascade="all, delete-orphan")
     exam: Mapped[Optional["Exam"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
         back_populates="raw_file"
     )
@@ -127,24 +121,18 @@ class RawExtraction(UUIDMixin, Base):
     # SQLite: JSON string olarak saklanır; PostgreSQL: native JSONB.
     # Sorgulama ihtiyacı doğarsa PostgreSQL'e geçişte JSONB'ye migrate edilir.
 
-    confidence: Mapped[Optional[float]] = mapped_column(
-        Numeric(3, 2), nullable=True
-    )
+    confidence: Mapped[Optional[float]] = mapped_column(Numeric(3, 2), nullable=True)
     # 0.00 – 1.00; detector'ın format eşleşme güveni.
 
     warnings: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     # Engelleyici olmayan uyarı mesajları (str listesi).
     # SQLite: JSON array string; PostgreSQL: native ARRAY(Text).
 
-    extracted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    extracted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     # ── İlişkiler ─────────────────────────────────────────────────────────────
     raw_file: Mapped["RawFile"] = relationship(back_populates="extractions")
-    review_entries: Mapped[list["ReviewQueue"]] = relationship(
-        back_populates="raw_extraction", cascade="all, delete-orphan"
-    )
+    review_entries: Mapped[list["ReviewQueue"]] = relationship(back_populates="raw_extraction", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<RawExtraction id={self.id} parser={self.parser_used!r}>"
@@ -185,25 +173,19 @@ class ReviewQueue(UUIDMixin, TimestampMixin, Base):
     reason_detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # İnsan tarafından okunabilir açıklama.
 
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default=ReviewQueueStatus.PENDING
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default=ReviewQueueStatus.PENDING)
 
     resolved_by: Mapped[Optional[uuid.UUID]] = mapped_column(
         Uuid(),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Onay veya red sebebi; rehber öğretmen tarafından doldurulur.
 
     # ── İlişkiler ─────────────────────────────────────────────────────────────
-    raw_extraction: Mapped["RawExtraction"] = relationship(
-        back_populates="review_entries"
-    )
+    raw_extraction: Mapped["RawExtraction"] = relationship(back_populates="review_entries")
     resolver: Mapped[Optional["User"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
         back_populates="resolved_reviews",
         foreign_keys=[resolved_by],

@@ -45,7 +45,9 @@ class Result(UUIDMixin, TimestampMixin, Base):
     __table_args__ = (
         # Bir öğrencinin aynı sınavda aynı kazanım için iki kaydı olamaz.
         UniqueConstraint(
-            "student_id", "exam_id", "learning_outcome_id",
+            "student_id",
+            "exam_id",
+            "learning_outcome_id",
             name="uq_result_student_exam_outcome",
         ),
         # measured=True ise D+Y+B toplamı total_questions'a eşit olmak zorunda.
@@ -128,7 +130,4 @@ class Result(UUIDMixin, TimestampMixin, Base):
         return round(self.correct / self.total_questions * 100, 2)
 
     def __repr__(self) -> str:
-        return (
-            f"<Result student={self.student_id} exam={self.exam_id} "
-            f"correct={self.correct} measured={self.measured}>"
-        )
+        return f"<Result student={self.student_id} exam={self.exam_id} correct={self.correct} measured={self.measured}>"

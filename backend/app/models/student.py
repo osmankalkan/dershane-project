@@ -24,7 +24,8 @@ class Student(UUIDMixin, TimestampMixin, Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "class_id", "student_code",
+            "class_id",
+            "student_code",
             name="uq_student_class_code",
         ),
         # student_code NULL olabilir; NULL'lar UNIQUE kısıtını ihlal etmez

@@ -73,6 +73,7 @@ class SQLAlchemyRepository(AbstractRepository[T], Generic[T]):
 # Somut Repository'ler
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class StudentRepository(SQLAlchemyRepository[Student]):
     """students tablosu için repository."""
 
@@ -95,9 +96,4 @@ class StudentRepository(SQLAlchemyRepository[Student]):
 
     def list_by_class(self, class_id: uuid.UUID) -> list[Student]:
         """Belirli bir sınıftaki tüm öğrencileri döndürür."""
-        return (
-            self._db.query(Student)
-            .filter(Student.class_id == class_id)
-            .order_by(Student.full_name)
-            .all()
-        )
+        return self._db.query(Student).filter(Student.class_id == class_id).order_by(Student.full_name).all()
