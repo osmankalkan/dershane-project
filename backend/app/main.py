@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1 import review, upload
 from app.core.config import settings
 from app.core.database import init_db
 
@@ -54,11 +55,12 @@ app.add_middleware(
 # ── Router kayıtları ──────────────────────────────────────────────────────────
 # Faz 0'da aktif endpoint'ler buraya eklenir.
 # Her router kendi dosyasında tanımlı; main.py'ye sadece include edilir.
-#
-# from app.api.v1 import students, exams, upload
+
+
 # app.include_router(students.router, prefix="/api/v1/students", tags=["students"])
 # app.include_router(exams.router,    prefix="/api/v1/exams",    tags=["exams"])
-# app.include_router(upload.router,   prefix="/api/v1/upload",   tags=["upload"])
+app.include_router(upload.router, prefix="/api/v1/upload", tags=["upload"])
+app.include_router(review.router, prefix="/api/v1/review", tags=["review"])
 
 
 @app.get("/health", tags=["system"])

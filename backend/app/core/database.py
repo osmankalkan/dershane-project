@@ -22,6 +22,7 @@ Kullanım (FastAPI dependency):
 
 from __future__ import annotations
 
+import uuid as _uuid
 from collections.abc import Generator
 
 from sqlalchemy import create_engine, event
@@ -70,8 +71,15 @@ SessionLocal = sessionmaker(
 )
 
 
+# ── Faz 0: Sistem kullanıcısı için sabit UUID ────────────────────────────────
+# Auth aktif olmadığında (ADR-007) yükleme işlemlerinde uploaded_by FK'si
+# için bu UUID kullanılır. Faz 1'de gerçek JWT token decode edilir.
+# Not: SQLite NUMERIC affinity sorununu aşmak için harf içerir ('a').
+SYSTEM_USER_ID: _uuid.UUID = _uuid.UUID("00000000-0000-0000-0000-00000000000a")
+
+
 def init_db() -> None:
-    """Tüm tabloları oluşturur (Faz 0 — Alembic yerine).
+    """Tüm tabloları oluşturur ve Faz 0 için seed verisi ekler.
 
     Faz 1'de bu fonksiyon kaldırılır; Alembic migration'ları devreye girer.
     Var olan tablolara dokunmaz (checkfirst=True davranışı).
@@ -94,6 +102,34 @@ def init_db() -> None:
     )
 
     Base.metadata.create_all(bind=engine)
+
+    # Faz 0: Sistem kullanıcısını seed et (auth yokken FK için gerekli)
+    _seed_system_user()
+
+
+def _seed_system_user() -> None:
+    """Faz 0 sistem kullanıcısını oluşturur (yoksa).
+
+    Bu kullanıcı auth yokken uploaded_by FK'si için kullanılır.
+    Faz 1'de gerçek auth aktif edilince bu fonksiyon kaldırılır.
+    """
+    from app.models.user import User
+
+    db = SessionLocal()
+    try:
+        exists = db.query(User).filter_by(id=SYSTEM_USER_ID).first()
+        if not exists:
+            system_user = User(
+                id=SYSTEM_USER_ID,
+                email="system@localhost",
+                hashed_password="",  # Giriş yapılamaz — yalnızca FK referansı
+                role="admin",
+                is_active=False,  # Aktif değil; giriş yapılamaz
+            )
+            db.add(system_user)
+            db.commit()
+    finally:
+        db.close()
 
 
 def get_session() -> Generator[Session, None, None]:
