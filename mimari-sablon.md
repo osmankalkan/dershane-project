@@ -769,11 +769,11 @@ Proje süreçleri, kullanıcı ile mutabık kalınan aşağıdaki daha granüler
 ### Faz 5: FastAPI (Tamamlandı ✅)
 - Temel API uçlarının (upload, review, students, exams) FastAPI ile ayağa kaldırılması.
 
-### Faz 6: React (Başlangıç Yapıldı ⏳)
-- React ile (şu an CDN üzerinden basit prototip) ekranların tasarlanması. (İleride Vite + Tailwind yapısına geçiş)
+### Faz 6: React (Tamamlandı ✅)
+- Vite + TailwindCSS + React Router mimarisi ile profesyonel bir web projesi iskeleti oluşturuldu. Recharts ve shadcn tarzı premium komponentler eklendi.
 
-### Faz 7: PDF upload sistemi (gelişmiş) (Başlangıç Yapıldı ⏳)
-- Yükleme servisinin detaylandırılması. Şu an SHA-256 deduplication gibi temel özellikleri var ancak asenkron (Celery vb.) yapı eklenebilir.
+### Faz 7: PDF upload sistemi (gelişmiş) (Tamamlandı ✅)
+- Arayüzde `react-dropzone` kullanılarak animasyonlu, drag & drop özellikli dosya yükleme ekranı (UploadPage) geliştirildi. API tarafındaki SHA-256 kopya tespiti UI üzerinden başarılı / hatalı olarak ekrana yansıtıldı.
 
 ### Faz 8: Öğrenci analitik ekranları (Bekliyor)
 - Bireysel bazda başarı trendleri, ders/konu kırılımlı grafik API'lerinin ve arayüzlerinin yazılması.
