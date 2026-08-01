@@ -9,6 +9,10 @@
     <!-- JSX kodunu tarayıcıda derlemek için Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
+    <!-- Recharts ve bağımlılıkları -->
+    <script src="https://unpkg.com/prop-types/prop-types.min.js"></script>
+    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+    
     <style>
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
@@ -153,17 +157,20 @@
         // ── ÖĞRENCİ DETAY BİLEŞENİ ───────────────────────────────────────────
         function StudentDetail({ studentId, onBack }) {
             const [results, setResults] = useState([]);
+            const [performance, setPerformance] = useState([]);
             const [student, setStudent] = useState(null);
             const [loading, setLoading] = useState(true);
 
             useEffect(() => {
-                // Paralel istek: hem öğrenci temel bilgisini hem de sonuçlarını çek
+                // Paralel istek: öğrenci bilgisi, detay sonuçlar ve analitik trendi
                 Promise.all([
                     fetch(`${API_URL}/students/${studentId}`).then(r => r.json()),
-                    fetch(`${API_URL}/students/${studentId}/results`).then(r => r.json())
-                ]).then(([studentData, resultsData]) => {
+                    fetch(`${API_URL}/students/${studentId}/results`).then(r => r.json()),
+                    fetch(`${API_URL}/analytics/students/${studentId}/performance`).then(r => r.json())
+                ]).then(([studentData, resultsData, perfData]) => {
                     setStudent(studentData);
                     setResults(resultsData);
+                    setPerformance(perfData);
                     setLoading(false);
                 }).catch(err => {
                     console.error("API Hatası:", err);
@@ -172,12 +179,57 @@
 
             if (loading) return <div className="loading">Sınav analizleri yükleniyor...</div>;
 
+            // Grafik verisini hazırla
+            const chartData = performance.map(exam => {
+                const dataPoint = { name: exam.exam_name };
+                exam.subjects.forEach(sub => {
+                    dataPoint[sub.subject_name] = sub.net;
+                });
+                return dataPoint;
+            });
+            
+            const subjectNames = new Set();
+            performance.forEach(exam => {
+                exam.subjects.forEach(sub => subjectNames.add(sub.subject_name));
+            });
+            const subjects = Array.from(subjectNames);
+            const colors = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#0088FE", "#00C49F"];
+
             return (
                 <div>
                     <div className="breadcrumb">
                         <span className="clickable" onClick={onBack}>&larr; Öğrenci Listesine Dön</span>
                     </div>
-                    <h2>{student?.full_name} — Sınav Analizi (Ders/Konu/Kazanım)</h2>
+                    <h2>{student?.full_name} — Öğrenci Analitiği</h2>
+                    
+                    <div style={{ margin: '30px 0', height: 350, background: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                        <h3>Net Gelişim Trendi (Ders Bazlı)</h3>
+                        {chartData.length > 0 ? (
+                            <Recharts.ResponsiveContainer width="100%" height="90%">
+                                <Recharts.LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                    <Recharts.CartesianGrid strokeDasharray="3 3" />
+                                    <Recharts.XAxis dataKey="name" />
+                                    <Recharts.YAxis />
+                                    <Recharts.Tooltip />
+                                    <Recharts.Legend />
+                                    {subjects.map((sub, i) => (
+                                        <Recharts.Line 
+                                            key={sub} 
+                                            type="monotone" 
+                                            dataKey={sub} 
+                                            stroke={colors[i % colors.length]} 
+                                            strokeWidth={2}
+                                            activeDot={{ r: 6 }} 
+                                        />
+                                    ))}
+                                </Recharts.LineChart>
+                            </Recharts.ResponsiveContainer>
+                        ) : (
+                            <p style={{color: '#6b7280', marginTop: '20px'}}>Grafik için yeterli sınav verisi bulunmuyor.</p>
+                        )}
+                    </div>
+
+                    <h3 style={{marginTop: '40px'}}>Sınav Sonuçları (Kazanım Detaylı)</h3>
                     <table>
                         <thead>
                             <tr>
