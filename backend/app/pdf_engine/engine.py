@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any
 
 from app.pdf_engine.detector import FormatDetector
-from app.pdf_engine.ocr_fallback import is_image_based_pdf
+from app.pdf_engine.ocr_fallback import check_pdf_accessibility
 from app.pdf_engine.parsers.base_parser import BasePDFParser
 from app.pdf_engine.validator import ValidationError, validate_result_counts
 
@@ -58,6 +58,7 @@ class ReviewReason:
     """review_queue.reason için sabit değerler."""
 
     IMAGE_BASED_PDF = "IMAGE_BASED_PDF"
+    CORRUPTED_FILE = "CORRUPTED_FILE"
     UNKNOWN_FORMAT = "UNKNOWN_FORMAT"
     EXTRACTION_FAILED = "EXTRACTION_FAILED"
     NORMALIZATION_FAILED = "NORMALIZATION_FAILED"
@@ -159,8 +160,25 @@ class PDFEngine:
         """
         logger.info("PDF Engine başlatıldı: %s", pdf_path.name)
 
-        # ── Adım 0: İmaj tabanlı PDF (tarayıcı) kontrolü ──────────────────
-        if is_image_based_pdf(pdf_path):
+        # ── Adım 0: Fiziksel bozukluk ve İmaj tabanlı PDF kontrolü ────────────
+        accessibility = check_pdf_accessibility(pdf_path)
+
+        if accessibility == "CORRUPTED":
+            logger.warning("Fiziksel olarak bozuk dosya tespit edildi: %s", pdf_path.name)
+            return EngineResult(
+                status=EngineResultStatus.NEEDS_REVIEW,
+                parser_name="UNKNOWN_FORMAT",
+                confidence=0.0,
+                raw_data={},
+                warnings=["PDF dosyası okunamadı veya fiziksel olarak bozuk."],
+                review_reason=ReviewReason.CORRUPTED_FILE,
+                review_detail=(
+                    "PDF dosyası açılamadı. Dosya bozuk, hatalı indirilmiş veya "
+                    "orijinalde PDF olmayan bir dosya (.png, .docx vs.) olabilir."
+                ),
+            )
+
+        if accessibility == "IMAGE_BASED":
             logger.warning("Resim tabanlı PDF tespit edildi: %s", pdf_path.name)
             return EngineResult(
                 status=EngineResultStatus.NEEDS_REVIEW,

@@ -176,6 +176,21 @@ class UploadService:
                 detail=(f"Bu PDF daha önce yüklenmiş. Mevcut kayıt: {existing.id} (status={existing.status})"),
             )
 
+        # ── 1.b. Mantıksal Duplicate (Aynı Sınavın Tekrar Yüklenmesi) ──────────
+        logical_dup = self._find_logical_duplicate(institution_id, exam_name, exam_date)
+        if logical_dup:
+            logger.warning("Mantıksal duplicate (aynı sınav adı/tarihi): %s", exam_name)
+            # Opsiyonel: Burada direkt bloke edebilir veya uyarı (warning) listesine ekleyebiliriz.
+            # Şu an veri bütünlüğü için tam blokaj (DUPLICATE) yapıyoruz.
+            return UploadResult(
+                raw_file_id=logical_dup.id,
+                status="DUPLICATE",
+                parser_name="",
+                detail=(
+                    f"'{exam_name}' adlı sınav bu kurumda daha önce işlenmiş. Mükerrer veri oluşumunu önlemek için işlem durduruldu."
+                ),
+            )
+
         saved_path = self._save_to_disk(file_bytes, original_name)
 
         # ── 2. raw_files kaydı oluştur (PENDING) ──────────────────────────
@@ -473,6 +488,14 @@ class UploadService:
     def _find_duplicate(self, file_hash: str) -> RawFile | None:
         """Aynı hash'e sahip daha önce yüklenmiş dosyayı arar."""
         return self._db.query(RawFile).filter_by(file_hash=file_hash).first()
+
+    def _find_logical_duplicate(self, institution_id: uuid.UUID, exam_name: str, exam_date: date) -> RawFile | None:
+        """Aynı kurumda, aynı ad ve tarihle daha önce yüklenmiş başarılı bir sınav (RawFile) arar."""
+        exam = self._db.query(Exam).filter_by(institution_id=institution_id, name=exam_name, exam_date=exam_date).first()
+
+        if exam and exam.raw_file_id:
+            return self._db.query(RawFile).filter_by(id=exam.raw_file_id).first()
+        return None
 
     @staticmethod
     def _make_short_code(name: str) -> str:

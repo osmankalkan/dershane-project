@@ -18,23 +18,15 @@ import pdfplumber
 logger = logging.getLogger(__name__)
 
 
-def is_image_based_pdf(pdf_path: Path, text_length_threshold: int = 50) -> bool:
-    """PDF'in metin katmanı içerip içermediğini kontrol eder.
-
-    İlk 3 sayfayı kontrol ederek toplam çıkarılan metin karakter sayısının
-    threshold'un altında kalıp kalmadığına bakar. (Örn: Boş PDF veya sadece resim).
-
-    Args:
-        pdf_path: Kontrol edilecek PDF'in yolu.
-        text_length_threshold: Toplam metin karakteri için minimum sınır.
+def check_pdf_accessibility(pdf_path: Path, text_length_threshold: int = 50) -> str:
+    """PDF'in fiziksel durumunu ve metin içerip içermediğini kontrol eder.
 
     Returns:
-        bool: True ise dosya yüksek ihtimalle salt resim veya OCR gerektiriyor.
+        str: "OK" (Sorun yok), "IMAGE_BASED" (Tarayıcı), "CORRUPTED" (Fiziksel bozukluk)
     """
     total_text = ""
     try:
         with pdfplumber.open(pdf_path) as pdf:
-            # Tüm PDF'i okumak yerine sadece ilk 3 sayfaya bakmak (hız için)
             pages_to_check = min(3, len(pdf.pages))
 
             for i in range(pages_to_check):
@@ -42,13 +34,10 @@ def is_image_based_pdf(pdf_path: Path, text_length_threshold: int = 50) -> bool:
                 if text:
                     total_text += text.strip()
 
-                # Zaten yeteri kadar metin bulduysak, resmi olmadığını anlarız
                 if len(total_text) > text_length_threshold:
-                    return False
+                    return "OK"
 
-        # Döngü bittiğinde hala metin çok azsa veya yoksa
-        return len(total_text) < text_length_threshold
+        return "IMAGE_BASED" if len(total_text) < text_length_threshold else "OK"
     except Exception as exc:
-        logger.warning(f"PDF okunurken hata oluştu (is_image_based_pdf): {exc}")
-        # PDF bozuk bile olsa "metin yok" olarak davran ki engine hata dönsün
-        return True
+        logger.warning(f"PDF bozuk veya açılamıyor (check_pdf_accessibility): {exc}")
+        return "CORRUPTED"
