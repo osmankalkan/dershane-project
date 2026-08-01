@@ -745,83 +745,50 @@ dershane-project/
 
 ---
 
-## 13. Geliştirme Fazları
+## 13. Geliştirme Fazları (Kullanıcının Faz Şablonu)
 
-### Faz 0 — Local MVP ⬅ ŞU AN BURADASIN
+Proje süreçleri, kullanıcı ile mutabık kalınan aşağıdaki daha granüler (12 Faz) yapı üzerinden yürütülmektedir:
 
-> **Strateji:** Dikey dilim (vertical slice). Auth, Docker, Celery yok.
-> Tek amaç: PDF yükle → parse et → SQLite'a yaz → ekranda göster.
-> Tüm soyutlamalar yerli yerinde; ileride hiçbir iş mantığı değişmez.
+### Faz 0: Local MVP (Tamamlandı ✅)
+- Auth yok, SQLite, tek format parser.
+- Uçtan uca çalışan minimal akış: PDF yükle → parse et → doğrula → veritabanına yaz → ekranda göster.
+- *Not: Biz bu MVP kapsamında aslında Faz 1, 2, 3 ve 5'in temel kısımlarını inşa etmiş olduk.*
 
-**Kapsam dışı (kasıtlı olarak ertelendi):**
-- ❌ Auth / JWT / RBAC (ADR-007)
-- ❌ Celery + Redis (ADR-006 ile BackgroundTasks ile soyutlandı)
-- ❌ Docker / PostgreSQL (ADR-005 ile SQLite kullanılıyor)
-- ❌ review_queue onay ekranı
-- ❌ Multi-tenant / kurum yönetimi
+### Faz 1: Data model + ER diagram (detaylı) (Tamamlandı ✅)
+- SQLAlchemy modellerinin yazılması, ilişkilerin (Institution, Class, Student, Result vs.) kurulması.
 
-**Tamamlanacak işler:**
-- [x] `base_parser.py` soyut arayüzü
-- [x] `validator.py` + testleri
-- [x] SQLAlchemy modelleri (`models/`)
-- [ ] `core/config.py` — Pydantic Settings, `DATABASE_URL=sqlite:///./dershane.db`
-- [ ] `core/database.py` — SQLAlchemy engine + session factory (DB-agnostic)
-- [ ] `repositories/base_repository.py` — Generic soyut repository
-- [ ] `repositories/student_repository.py` — SQLAlchemy implementasyonu
-- [ ] `repositories/exam_repository.py`
-- [ ] `repositories/result_repository.py`
-- [ ] `tasks/base_task.py` — `AbstractTaskRunner` arayüzü
-- [ ] `tasks/background_task_runner.py` — FastAPI `BackgroundTasks` implementasyonu
-- [ ] `api/v1/upload.py` — PDF yükleme endpoint'i (auth yok)
-- [ ] `api/v1/students.py` — Öğrenci listeleme (auth yok)
-- [ ] `api/v1/exams.py` — Sınav listeleme (auth yok)
-- [ ] `app/main.py` — FastAPI app, tablo create_all, CORS
-- [ ] `parser_yayinevi_a.py` — İlk gerçek parser implementasyonu
-- [ ] Manuel test: PDF yükle, DB'de gör, API'den oku
+### Faz 2: PDF extraction prototype (Tamamlandı ✅)
+- `pdfplumber` ile TYT formatı için ilk prototipin kodlanması, kaba verinin çıkartılması.
 
----
+### Faz 3: Normalization + validation (Tamamlandı ✅)
+- Çıkarılan verinin Validator ve Engine mekanizmalarıyla doğrulanması, D/Y/B ve net hesaplamalarının tutarlılık kontrolü.
 
-### Faz 1 — Altyapı Geçişi (SQLite → PostgreSQL + Auth)
+### Faz 4: PostgreSQL (Bekliyor)
+- SQLite'tan PostgreSQL'e geçiş ve veritabanının gerçek sunucu yapısına uygun hale getirilmesi.
 
-- [ ] `DATABASE_URL` ortam değişkeni ile PostgreSQL'e geçiş (kod değişmez)
-- [ ] Alembic migration kurulumu
-- [ ] Auth servis ve endpoint'leri (PyJWT + bcrypt)
-- [ ] JWT middleware — tüm endpoint'lere eklenir
-- [ ] Docker Compose (postgres + redis + backend)
-- [ ] `AbstractTaskRunner` → Celery implementasyonuyla swap
+### Faz 5: FastAPI (Tamamlandı ✅)
+- Temel API uçlarının (upload, review, students, exams) FastAPI ile ayağa kaldırılması.
 
-### Faz 2 — Backend API (Tam)
+### Faz 6: React (Başlangıç Yapıldı ⏳)
+- React ile (şu an CDN üzerinden basit prototip) ekranların tasarlanması. (İleride Vite + Tailwind yapısına geçiş)
 
-- [ ] Review queue endpoint'leri
-- [ ] Students / Exams tam CRUD
-- [ ] Analytics endpoint'leri
+### Faz 7: PDF upload sistemi (gelişmiş) (Başlangıç Yapıldı ⏳)
+- Yükleme servisinin detaylandırılması. Şu an SHA-256 deduplication gibi temel özellikleri var ancak asenkron (Celery vb.) yapı eklenebilir.
 
-### Faz 3 — Temel Frontend
+### Faz 8: Öğrenci analitik ekranları (Bekliyor)
+- Bireysel bazda başarı trendleri, ders/konu kırılımlı grafik API'lerinin ve arayüzlerinin yazılması.
 
-- [ ] Vite + React kurulumu
-- [ ] Auth (login sayfası, token yönetimi)
-- [ ] PDF upload ekranı (drag & drop, durum göstergesi)
-- [ ] Öğrenci listesi
+### Faz 9: Kurum geneli analitik (Bekliyor)
+- Sınıf/Kurum bazında başarı ortalamaları, zümre/ders raporları.
 
-### Faz 4 — Analitik ve Dashboard
+### Faz 10: Test + güvenlik (Auth, RBAC) (Bekliyor)
+- Sisteme giriş yapabilen kullanıcı rolleri, JWT korumalı token'lar.
 
-- [ ] `analytics_service.py` (ders bazlı performans, konu kırılımı)
-- [ ] Dashboard sayfası (grafikler, özet kartlar)
-- [ ] Bireysel öğrenci detay sayfası (zaman içi trend grafikleri)
-- [ ] Sınav detay sayfası
+### Faz 11: Docker + local deployment (Bekliyor)
+- Tüm sistemin konteynerleştirilip canlı ortama hazırlanması.
 
-### Faz 5 — Onay Kuyruğu ve İnsan Onayı
-
-- [ ] `review_queue` ekranı (rehber öğretmen için)
-- [ ] Onaylama / reddetme akışı
-- [ ] Bildirim sistemi (e-posta veya uygulama içi)
-
-### Faz 6 — İkinci Format + Deployment
-
-- [ ] `parser_yayinevi_b.py` (ikinci yayınevi formatı)
-- [ ] Dockerfile'lar tamamlandı, Nginx konfigürasyonu
-- [ ] CI/CD pipeline (GitHub Actions)
-- [ ] Production ortamı kurulumu
+### Faz 12: AI/ML (opsiyonel) (Bekliyor)
+- Öğrenci gelişimine göre otomatik tahminler veya öneriler sunan akıllı modeller.
 
 ---
 
