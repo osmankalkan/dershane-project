@@ -1,17 +1,35 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, ChevronRight, Search } from 'lucide-react';
+import { Users, ChevronRight, Search, Filter } from 'lucide-react';
 import apiClient from '../api/client';
 
 export default function StudentsList() {
   const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [selectedClassId, setSelectedClassId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Sınıfları çek
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        const res = await apiClient.get('/classes/');
+        setClasses(res.data);
+      } catch (err) {
+        console.error("Sınıflar yüklenemedi:", err);
+      }
+    };
+    fetchClasses();
+  }, []);
+
+  // Öğrencileri çek (Sınıf filtresi değiştiğinde tekrar çalışır)
   useEffect(() => {
     const fetchStudents = async () => {
+      setLoading(true);
       try {
-        const res = await apiClient.get('/students/');
+        const url = selectedClassId ? `/students/?class_id=${selectedClassId}` : '/students/';
+        const res = await apiClient.get(url);
         setStudents(res.data);
       } catch (err) {
         console.error("API Hatası:", err);
@@ -20,7 +38,7 @@ export default function StudentsList() {
       }
     };
     fetchStudents();
-  }, []);
+  }, [selectedClassId]);
 
   const filteredStudents = students.filter(s => 
     s.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -50,6 +68,34 @@ export default function StudentsList() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+      </div>
+
+      {/* Sınıf Filtreleme Sekmeleri */}
+      <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        <Filter className="w-5 h-5 text-gray-400 mr-2 shrink-0" />
+        <button
+          onClick={() => setSelectedClassId(null)}
+          className={`shrink-0 px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+            selectedClassId === null 
+              ? 'bg-blue-600 text-white shadow-sm' 
+              : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+          }`}
+        >
+          Tüm Sınıflar
+        </button>
+        {classes.map(cls => (
+          <button
+            key={cls.id}
+            onClick={() => setSelectedClassId(cls.id)}
+            className={`shrink-0 px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+              selectedClassId === cls.id 
+                ? 'bg-blue-600 text-white shadow-sm' 
+                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+            }`}
+          >
+            {cls.name}
+          </button>
+        ))}
       </div>
 
       <div className="bg-white shadow-sm ring-1 ring-gray-200 rounded-xl overflow-hidden">

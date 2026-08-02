@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_session
@@ -14,16 +14,17 @@ router = APIRouter()
     "/",
     status_code=status.HTTP_200_OK,
     summary="Tüm Öğrencileri Listele",
-    description="Sisteme kayıtlı tüm öğrencileri getirir.",
+    description="Sisteme kayıtlı tüm öğrencileri getirir. class_id verilirse filtreler.",
 )
 def get_students(
+    class_id: uuid.UUID | None = Query(None, description="Filtrelenecek sınıf ID'si"),
     limit: int = 100,
     skip: int = 0,
     db: Session = Depends(get_session),
 ) -> list[dict[str, Any]]:
     """Tüm öğrencileri listeler."""
     service = StudentService(db)
-    return service.get_all_students(limit=limit, skip=skip)
+    return service.get_all_students(limit=limit, skip=skip, class_id=class_id)
 
 
 @router.get(

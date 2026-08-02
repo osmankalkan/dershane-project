@@ -22,10 +22,15 @@ class StudentService:
     def __init__(self, db: Session) -> None:
         self._db = db
 
-    def get_all_students(self, limit: int = 100, skip: int = 0) -> list[dict[str, Any]]:
-        """Tüm öğrencileri sayfalamalı olarak listeler."""
+    def get_all_students(self, limit: int = 100, skip: int = 0, class_id: uuid.UUID | None = None) -> list[dict[str, Any]]:
+        """Tüm öğrencileri sayfalamalı olarak listeler. class_id verilirse filtreler."""
         # JOIN kullanarak sınıf bilgilerini de alalım (N+1 problemini önleriz)
-        students = self._db.query(Student).join(Class).order_by(Student.full_name).offset(skip).limit(limit).all()
+        query = self._db.query(Student).join(Class)
+
+        if class_id:
+            query = query.filter(Student.class_id == class_id)
+
+        students = query.order_by(Student.full_name).offset(skip).limit(limit).all()
 
         return [
             {
