@@ -1,42 +1,45 @@
-services:
+version: '3.8'
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # PostgreSQL 16 — Ana veritabanı
-  # ─────────────────────────────────────────────────────────────────────────────
+services:
   db:
-    image: postgres:16-alpine
+    image: postgres:15-alpine
     container_name: dershane_db
-    restart: unless-stopped
+    restart: always
+    environment:
+      POSTGRES_USER: dershane_user
+      POSTGRES_PASSWORD: dershane_password
+      POSTGRES_DB: dershane_db
     ports:
       - "5432:5432"
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      - pgdata:/var/lib/postgresql/data
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Redis — Celery task kuyruğu
-  # ─────────────────────────────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: dershane_redis
-    restart: unless-stopped
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dershane_backend
+    restart: always
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://dershane_user:dershane_password@db:5432/dershane_db
     ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "8000:8000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dershane_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "5173:80"
 
 volumes:
-  postgres_data:
-    driver: local
+  pgdata:
