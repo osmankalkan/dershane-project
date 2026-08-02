@@ -28,3 +28,13 @@ def get_student_performance(student_id: uuid.UUID, db: Session = Depends(get_ses
 def get_institution_weak_topics(institution_id: uuid.UUID, limit: int = 10, db: Session = Depends(get_session)) -> list[dict[str, Any]]:
     service = AnalyticsService(db)
     return service.get_institution_weak_topics(institution_id, limit=limit)
+
+
+@router.get(
+    "/students/{student_id}/ranking",
+    summary="Öğrenci Kurum/Sınıf Sıralaması",
+    description="Öğrencinin kurum ve sınıf içindeki genel başarı sıralamasını (rank) hesaplar.",
+)
+def get_student_ranking(student_id: uuid.UUID, db: Session = Depends(get_session)) -> dict[str, Any]:
+    service = AnalyticsService(db)
+    return service.get_student_ranking(student_id)

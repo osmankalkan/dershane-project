@@ -1,29 +1,34 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, User, BarChart2, BookOpen } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ArrowLeft, User, BarChart2, BookOpen, Target, AlertCircle, Medal } from 'lucide-react';
 import apiClient from '../api/client';
+import PerformanceLineChart from '../components/charts/PerformanceLineChart';
+import SubjectRadarChart from '../components/charts/SubjectRadarChart';
+import TopicBreakdownBar from '../components/charts/TopicBreakdownBar';
 
 export default function StudentDetail() {
   const { id } = useParams();
   const [student, setStudent] = useState(null);
   const [results, setResults] = useState([]);
   const [performance, setPerformance] = useState([]);
+  const [ranking, setRanking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [studentRes, resultsRes, perfRes] = await Promise.all([
+        const [studentRes, resultsRes, perfRes, rankRes] = await Promise.all([
           apiClient.get(`/students/${id}/`),
           apiClient.get(`/students/${id}/results`),
-          apiClient.get(`/analytics/students/${id}/performance`)
+          apiClient.get(`/analytics/students/${id}/performance`),
+          apiClient.get(`/analytics/students/${id}/ranking`).catch(() => ({ data: null })) // Fallback in case of error
         ]);
         
         setStudent(studentRes.data);
         setResults(Array.isArray(resultsRes.data) ? resultsRes.data : []);
         setPerformance(Array.isArray(perfRes.data) ? perfRes.data : []);
+        setRanking(rankRes.data);
       } catch (err) {
         console.error("API Hatası:", err);
         setError("Öğrenci verileri yüklenirken bir hata oluştu.");
@@ -55,8 +60,10 @@ export default function StudentDetail() {
     );
   }
 
-  // Grafik verisini hazırla
-  const chartData = performance.map(exam => {
+  // --- DATA PREPARATION FOR CHARTS ---
+  
+  // 1. Line Chart Data (Net Trend)
+  const lineChartData = performance.map(exam => {
     const dataPoint = { name: exam.exam_name };
     exam.subjects.forEach(sub => {
       dataPoint[sub.subject_name] = sub.net;
@@ -69,7 +76,40 @@ export default function StudentDetail() {
     exam.subjects.forEach(sub => subjectNames.add(sub.subject_name));
   });
   const subjects = Array.from(subjectNames);
-  const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6"];
+
+  // 2. Radar Chart Data (Latest Subject Proficiency)
+  const radarData = [];
+  if (performance.length > 0) {
+    // Get the latest exam's subjects
+    const latestExam = performance[performance.length - 1];
+    latestExam.subjects.forEach(sub => {
+      radarData.push({
+        subject: sub.subject_name,
+        success_rate: sub.success_rate,
+        fullMark: 100
+      });
+    });
+  }
+
+  // 3. Topic Breakdown Bar Data (Weakest Topics overall)
+  const topicStats = {};
+  results.forEach(r => {
+    if (!topicStats[r.topic_name]) {
+      topicStats[r.topic_name] = { correct: 0, total: 0 };
+    }
+    topicStats[r.topic_name].correct += r.correct;
+    topicStats[r.topic_name].total += r.total_questions;
+  });
+
+  const topicData = Object.keys(topicStats).map(topic => {
+    const stat = topicStats[topic];
+    return {
+      topic,
+      success_rate: stat.total > 0 ? (stat.correct / stat.total) * 100 : 0
+    };
+  }).sort((a, b) => a.success_rate - b.success_rate).slice(0, 5); // Take bottom 5 weakest topics
+
+  // ------------------------------------
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
@@ -79,55 +119,81 @@ export default function StudentDetail() {
           <ArrowLeft className="w-4 h-4 mr-1" />
           Öğrenci Listesine Dön
         </Link>
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-blue-100 text-blue-700 rounded-full">
-            <User className="w-8 h-8" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-100 text-blue-700 rounded-full">
+              <User className="w-8 h-8" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{student?.full_name}</h1>
+              <p className="text-gray-500 font-medium mt-1">Sınıf: {student?.class_name} • Kod: {student?.student_code || 'Belirtilmemiş'}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{student?.full_name}</h1>
-            <p className="text-gray-500 font-medium mt-1">Sınıf: {student?.class_name} • Kod: {student?.student_code || 'Belirtilmemiş'}</p>
-          </div>
+          
+          {/* Ranking Badge */}
+          {ranking && ranking.total_in_institution > 0 && (
+            <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-yellow-100 text-yellow-600 rounded-lg">
+                  <Medal className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase">Kurum Derecesi</p>
+                  <p className="text-lg font-bold text-gray-900">{ranking.rank_in_institution} <span className="text-sm font-normal text-gray-500">/ {ranking.total_in_institution}</span></p>
+                </div>
+              </div>
+              <div className="w-px h-10 bg-gray-200 mx-2"></div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase">Sınıf Derecesi</p>
+                <p className="text-lg font-bold text-gray-900">{ranking.rank_in_class} <span className="text-sm font-normal text-gray-500">/ {ranking.total_in_class}</span></p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Analytics Chart */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-32 bg-blue-50/50 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-        <div className="flex items-center gap-2 mb-6">
-          <BarChart2 className="w-6 h-6 text-blue-500" />
-          <h2 className="text-xl font-bold text-gray-800">Net Gelişim Trendi</h2>
-        </div>
+      {/* Grid Layout for Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <div className="h-80 w-full">
-          {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dx={-10} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                  cursor={{ stroke: '#e5e7eb', strokeWidth: 2, strokeDasharray: '3 3' }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-                {subjects.map((sub, i) => (
-                  <Line 
-                    key={sub} 
-                    type="monotone" 
-                    dataKey={sub} 
-                    stroke={colors[i % colors.length]} 
-                    strokeWidth={3}
-                    dot={{ r: 4, strokeWidth: 2 }}
-                    activeDot={{ r: 6, strokeWidth: 0 }} 
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-full flex items-center justify-center text-gray-400">
-              Grafik için yeterli sınav verisi bulunmuyor.
+        {/* Main Line Chart (Spans 2 columns) */}
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-200 p-6 relative overflow-hidden flex flex-col">
+          <div className="absolute top-0 right-0 p-32 bg-blue-50/50 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+          <div className="flex items-center gap-2 mb-6">
+            <BarChart2 className="w-6 h-6 text-blue-500" />
+            <h2 className="text-xl font-bold text-gray-800">Net Gelişim Trendi</h2>
+          </div>
+          <div className="flex-1 min-h-[300px]">
+            <PerformanceLineChart chartData={lineChartData} subjects={subjects} />
+          </div>
+        </div>
+
+        {/* Right Column Stack */}
+        <div className="flex flex-col gap-6">
+          
+          {/* Radar Chart */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="w-5 h-5 text-indigo-500" />
+              <h2 className="text-lg font-bold text-gray-800">Ders Yetkinlik Analizi</h2>
             </div>
-          )}
+            <p className="text-xs text-gray-500 mb-4">En son sınava göre başarı oranları</p>
+            <div className="flex-1 min-h-[220px]">
+              <SubjectRadarChart radarData={radarData} />
+            </div>
+          </div>
+
+          {/* Topic Breakdown Bar */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle className="w-5 h-5 text-red-500" />
+              <h2 className="text-lg font-bold text-gray-800">En Zayıf Konular</h2>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">Tüm sınavlar toplamındaki başarıya göre</p>
+            <div className="flex-1 min-h-[180px]">
+              <TopicBreakdownBar topicData={topicData} />
+            </div>
+          </div>
+          
         </div>
       </div>
 

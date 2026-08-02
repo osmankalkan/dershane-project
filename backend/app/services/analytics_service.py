@@ -143,3 +143,70 @@ class AnalyticsService:
         results_computed.sort(key=lambda x: x["success_rate"])
 
         return results_computed[:limit]
+
+    def get_student_ranking(self, student_id: uuid.UUID) -> dict[str, Any]:
+        """Öğrencinin kendi sınıfındaki ve kurumundaki genel başarı sıralamasını hesaplar."""
+        from app.models.institution import Class
+        from app.models.student import Student
+
+        # Öğrencinin sınıf ve kurum ID'sini al
+        student = self._db.query(Student).join(Class).filter(Student.id == student_id).first()
+        if not student:
+            return {"rank_in_class": 0, "total_in_class": 0, "rank_in_institution": 0, "total_in_institution": 0}
+
+        class_id = student.class_id
+        institution_id = student.class_.institution_id
+
+        # Kurumdaki tüm öğrencilerin net ortalamasını (ya da toplam netini) hesapla
+        # Subquery: Her öğrenci için toplam net (sum(correct) - sum(wrong)*0.25)
+        # SQLAlchemy func.sum ile yapalım.
+        # Basitlik için sadece sum(correct) kullanabiliriz veya result üzerinden hesaplayabiliriz.
+        # Daha doğru bir sıralama için: öğrenci bazlı toplam doğru oranına bakalım.
+
+        # Öğrenci ID'si -> Toplam Doğru Sözlüğü (Kurumdaki herkes için)
+        results = (
+            self._db.query(Result.student_id, Student.class_id, func.sum(Result.correct).label("total_correct"))
+            .select_from(Result)
+            .join(Student, Result.student_id == Student.id)
+            .join(Class, Student.class_id == Class.id)
+            .filter(Class.institution_id == institution_id)
+            .group_by(Result.student_id, Student.class_id)
+            .all()
+        )
+
+        institution_scores = []
+        class_scores = []
+
+        for r in results:
+            score = r.total_correct or 0
+            institution_scores.append({"student_id": r.student_id, "score": score})
+            if r.class_id == class_id:
+                class_scores.append({"student_id": r.student_id, "score": score})
+
+        # Tüm öğrencilerin (sınava girmeyenlerin de) sayısı
+        total_in_inst = self._db.query(Student).join(Class).filter(Class.institution_id == institution_id).count()
+        total_in_class = self._db.query(Student).filter(Student.class_id == class_id).count()
+
+        # Sırala (Yüksek skor en üstte)
+        institution_scores.sort(key=lambda x: x["score"], reverse=True)
+        class_scores.sort(key=lambda x: x["score"], reverse=True)
+
+        # Öğrencinin sırasını bul (Listede yoksa bile son sıradadır varsayımı)
+        inst_rank = total_in_inst
+        for i, s in enumerate(institution_scores):
+            if s["student_id"] == student_id:
+                inst_rank = i + 1
+                break
+
+        cls_rank = total_in_class
+        for i, s in enumerate(class_scores):
+            if s["student_id"] == student_id:
+                cls_rank = i + 1
+                break
+
+        return {
+            "rank_in_class": cls_rank,
+            "total_in_class": max(total_in_class, 1),
+            "rank_in_institution": inst_rank,
+            "total_in_institution": max(total_in_inst, 1),
+        }

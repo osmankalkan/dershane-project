@@ -763,8 +763,9 @@ Proje süreçleri, kullanıcı ile mutabık kalınan aşağıdaki daha granüler
 ### Faz 3: Normalization + validation (Tamamlandı ✅)
 - Çıkarılan verinin Validator ve Engine mekanizmalarıyla doğrulanması, D/Y/B ve net hesaplamalarının tutarlılık kontrolü.
 
-### Faz 4: PostgreSQL (Bekliyor)
-- SQLite'tan PostgreSQL'e geçiş ve veritabanının gerçek sunucu yapısına uygun hale getirilmesi.
+### Faz 4: PostgreSQL'e Geçiş (Tamamlandı ✅)
+- SQLite'tan PostgreSQL'e geçiş için gerekli bağımlılıklar eklendi (psycopg2-binary).
+- Veritabanı URL'si `docker-compose.yml` üzerinden ortam değişkenleriyle (ENV) dinamik olarak yönetilebilir hale getirildi.
 
 ### Faz 5: FastAPI (Tamamlandı ✅)
 - Temel API uçlarının (upload, review, students, exams) FastAPI ile ayağa kaldırılması.
@@ -776,8 +777,8 @@ Proje süreçleri, kullanıcı ile mutabık kalınan aşağıdaki daha granüler
 ### Faz 7: PDF upload sistemi (gelişmiş) (Tamamlandı ✅)
 - Arayüzde `react-dropzone` kullanılarak animasyonlu, drag & drop özellikli dosya yükleme ekranı (UploadPage) geliştirildi. API tarafındaki SHA-256 kopya tespiti UI üzerinden başarılı / hatalı olarak ekrana yansıtıldı.
 
-### Faz 8: Öğrenci analitik ekranları (Bekliyor)
-- Bireysel bazda başarı trendleri, ders/konu kırılımlı grafik API'lerinin ve arayüzlerinin yazılması.
+### Faz 8: Öğrenci analitik ekranları (Tamamlandı ✅)
+- Bireysel bazda başarı trendleri, ders/konu kırılımlı grafik API'leri, Recharts ile zenginleştirilmiş (Radar ve BarChart) arayüzler ve öğrencinin sınıf/kurum geneli sıralamasını (ranking) hesaplayan sistem yazıldı.
 
 ### Faz 9: Kurum geneli analitik (Tamamlandı ✅)
 - Sınıf/Kurum bazında başarı ortalamalarını ve en zayıf kazanımları gösteren Kurum Paneli (Dashboard) ekranı ve `/institutions/{id}/weak-topics` API'si geliştirildi.
@@ -785,8 +786,8 @@ Proje süreçleri, kullanıcı ile mutabık kalınan aşağıdaki daha granüler
 ### Faz 10: Test + güvenlik (Auth, RBAC) (Bekliyor)
 - Sisteme giriş yapabilen kullanıcı rolleri, JWT korumalı token'lar.
 
-### Faz 11: Docker + local deployment (Bekliyor)
-- Tüm sistemin konteynerleştirilip canlı ortama hazırlanması.
+### Faz 11: Docker + local deployment (Tamamlandı ✅)
+- Tüm sistemin (PostgreSQL, FastAPI, Vite + Nginx) `docker-compose.yml` ve bağımsız `Dockerfile` dosyaları ile konteynerleştirilip canlı ortama (deployment) hazır hale getirilmesi.
 
 ### Faz 12: AI/ML (opsiyonel) (Bekliyor)
 - Öğrenci gelişimine göre otomatik tahminler veya öneriler sunan akıllı modeller.
