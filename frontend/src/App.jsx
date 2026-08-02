@@ -4,6 +4,7 @@ import UploadPage from './pages/UploadPage';
 import StudentsList from './pages/StudentsList';
 import StudentDetail from './pages/StudentDetail';
 import Dashboard from './pages/Dashboard';
+import ExamManagement from './pages/ExamManagement';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="/upload" element={<UploadPage />} />
           <Route path="/students" element={<StudentsList />} />
           <Route path="/students/:id" element={<StudentDetail />} />
+          <Route path="/exams" element={<ExamManagement />} />
         </Routes>
       </Layout>
     </Router>

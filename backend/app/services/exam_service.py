@@ -31,3 +31,13 @@ class ExamService:
             }
             for e in exams
         ]
+
+    def delete_exam(self, exam_id: Any) -> bool:
+        """Belirtilen sınavı ve (cascade sayesinde) ona bağlı tüm sonuçları (Result) siler."""
+        exam = self._db.query(Exam).filter(Exam.id == exam_id).first()
+        if not exam:
+            return False
+
+        self._db.delete(exam)
+        self._db.commit()
+        return True

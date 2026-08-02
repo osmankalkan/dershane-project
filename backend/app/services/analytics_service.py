@@ -210,3 +210,49 @@ class AnalyticsService:
             "rank_in_institution": inst_rank,
             "total_in_institution": max(total_in_inst, 1),
         }
+
+    def get_at_risk_students(self, drop_threshold_percent: float = 15.0) -> list[dict[str, Any]]:
+        """Ortalama netine kıyasla son sınavında %drop_threshold_percent ve üzeri düşüş yaşayan öğrencileri getirir."""
+        from sqlalchemy.orm import joinedload
+
+        from app.models.student import Student
+
+        # Tüm öğrencileri çek (küçük veriseti için in-memory işlem yapıyoruz, büyük veri için SQL optimize edilmeli)
+        students = self._db.query(Student).options(joinedload(Student.class_)).all()
+        at_risk = []
+
+        for student in students:
+            trends = self.get_student_performance_trend(student.id)
+            if len(trends) < 2:
+                continue  # Kıyaslamak için en az 2 sınav lazım
+
+            # Genel Ortalama Net (tüm sınavlar)
+            total_net = sum(sum(subj["net"] for subj in exam["subjects"]) for exam in trends)
+            avg_net = total_net / len(trends)
+
+            # Son sınav neti
+            last_exam = trends[-1]
+            last_net = sum(subj["net"] for subj in last_exam["subjects"])
+
+            if avg_net <= 0:
+                continue
+
+            # Düşüş yüzdesi hesapla
+            drop_percent = ((avg_net - last_net) / avg_net) * 100.0
+
+            if drop_percent >= drop_threshold_percent:
+                at_risk.append(
+                    {
+                        "student_id": str(student.id),
+                        "full_name": student.full_name,
+                        "class_name": student.class_.name,
+                        "avg_net": round(avg_net, 2),
+                        "last_net": round(last_net, 2),
+                        "drop_percent": round(drop_percent, 1),
+                        "last_exam_name": last_exam["exam_name"],
+                    }
+                )
+
+        # En çok düşüş yaşayandan en aza doğru sırala
+        at_risk.sort(key=lambda x: x["drop_percent"], reverse=True)
+        return at_risk

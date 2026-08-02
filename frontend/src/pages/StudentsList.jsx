@@ -102,29 +102,45 @@ export default function StudentsList() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50/50">
             <tr>
-              <th scope="col" className="py-4 pl-6 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Öğrenci Kodu</th>
+              <th scope="col" className="py-4 pl-6 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Derece</th>
               <th scope="col" className="px-3 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ad Soyad</th>
               <th scope="col" className="px-3 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sınıf</th>
+              <th scope="col" className="px-3 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ortalama Net</th>
               <th scope="col" className="relative py-4 pl-3 pr-6 text-right font-medium">İşlem</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
             {loading ? (
               <tr>
-                <td colSpan="4" className="py-10 text-center text-gray-500">Öğrenciler yükleniyor...</td>
+                <td colSpan="5" className="py-10 text-center text-gray-500">Öğrenciler yükleniyor...</td>
               </tr>
             ) : filteredStudents.length > 0 ? (
               filteredStudents.map((student) => (
                 <tr key={student.id} className="hover:bg-blue-50/50 transition-colors group cursor-default">
                   <td className="whitespace-nowrap py-4 pl-6 pr-3 text-sm font-medium text-gray-900">
-                    {student.student_code || '-'}
+                    {student.rank === 1 && <span className="text-xl" title="1. Sıra">🥇</span>}
+                    {student.rank === 2 && <span className="text-xl" title="2. Sıra">🥈</span>}
+                    {student.rank === 3 && <span className="text-xl" title="3. Sıra">🥉</span>}
+                    {student.rank > 3 && <span className="text-gray-500 font-bold ml-1">{student.rank}.</span>}
                   </td>
                   <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700 font-semibold">
-                    {student.full_name}
+                    <div className="flex flex-col">
+                      <span>{student.full_name}</span>
+                      <span className="text-xs text-gray-400">{student.student_code || '-'}</span>
+                    </div>
                   </td>
                   <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                       {student.class_name}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ${
+                      student.avg_net > 0 
+                        ? 'bg-green-100 text-green-800 border border-green-200' 
+                        : 'bg-gray-100 text-gray-600 border border-gray-200'
+                    }`}>
+                      {student.avg_net} Net
                     </span>
                   </td>
                   <td className="whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm font-medium">
@@ -132,14 +148,14 @@ export default function StudentsList() {
                       to={`/students/${student.id}`} 
                       className="inline-flex items-center text-blue-600 hover:text-blue-900 font-semibold group-hover:underline"
                     >
-                      Sonuçları İncele <ChevronRight className="w-4 h-4 ml-1" />
+                      İncele <ChevronRight className="w-4 h-4 ml-1" />
                     </Link>
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="4" className="py-10 text-center text-gray-500">Eşleşen öğrenci bulunamadı.</td>
+                <td colSpan="5" className="py-10 text-center text-gray-500">Eşleşen öğrenci bulunamadı.</td>
               </tr>
             )}
           </tbody>

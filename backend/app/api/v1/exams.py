@@ -23,3 +23,23 @@ def get_exams(
     """Sınav listesini getir."""
     service = ExamService(db)
     return service.get_all_exams(limit=limit, skip=skip)
+
+
+@router.delete(
+    "/{exam_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Sınavı Sil",
+    description="Sınavı ve bu sınava ait tüm öğrenci sonuçlarını (Result) kalıcı olarak siler.",
+)
+def delete_exam(
+    exam_id: Any,
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Belirtilen sınavı sil."""
+    from fastapi import HTTPException
+
+    service = ExamService(db)
+    success = service.delete_exam(exam_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Sınav bulunamadı.")
+    return {"status": "ok", "message": "Sınav başarıyla silindi."}

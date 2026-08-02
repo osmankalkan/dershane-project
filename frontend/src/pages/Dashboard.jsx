@@ -6,6 +6,7 @@ import apiClient from '../api/client';
 export default function Dashboard() {
   const [stats, setStats] = useState({ students: 0, exams: 0 });
   const [weakTopics, setWeakTopics] = useState([]);
+  const [atRiskStudents, setAtRiskStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -15,10 +16,11 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [studentsRes, examsRes, weakTopicsRes] = await Promise.all([
+        const [studentsRes, examsRes, weakTopicsRes, atRiskRes] = await Promise.all([
           apiClient.get('/students/'),
           apiClient.get('/exams/'),
-          apiClient.get(`/analytics/institutions/${INSTITUTION_ID}/weak-topics`)
+          apiClient.get(`/analytics/institutions/${INSTITUTION_ID}/weak-topics`),
+          apiClient.get('/analytics/students/at-risk?threshold=15')
         ]);
 
         setStats({
@@ -34,6 +36,7 @@ export default function Dashboard() {
         }));
 
         setWeakTopics(formattedTopics);
+        setAtRiskStudents(atRiskRes.data || []);
       } catch (err) {
         console.error("Dashboard veri hatası:", err);
         setError("Veriler yüklenirken bir hata oluştu.");
@@ -119,58 +122,104 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Weak Topics Horizontal Bar Chart */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-center gap-2 mb-8">
-          <AlertTriangle className="w-6 h-6 text-red-500" />
-          <h2 className="text-xl font-bold text-gray-800">Kurum Geneli En Zayıf Kazanımlar</h2>
-        </div>
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        <div className="h-[450px] w-full">
-          {weakTopics.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={weakTopics}
-                layout="vertical"
-                margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f3f4f6" />
-                <XAxis 
-                  type="number" 
-                  domain={[0, 100]} 
-                  tickFormatter={(val) => `%${val}`}
-                  tick={{fill: '#6b7280', fontSize: 12}}
-                />
-                <YAxis 
-                  type="category" 
-                  dataKey="displayName" 
-                  width={150} 
-                  tick={{fill: '#4b5563', fontSize: 12, fontWeight: 500}} 
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip content={<CustomTooltip />} cursor={{fill: '#f9fafb'}} />
-                <Bar 
-                  dataKey="success_rate" 
-                  radius={[0, 4, 4, 0]} 
-                  barSize={24}
-                  animationDuration={1500}
-                >
-                  {weakTopics.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={entry.success_rate < 30 ? '#ef4444' : entry.success_rate < 50 ? '#f97316' : '#eab308'} 
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3">
-              <AlertTriangle className="w-12 h-12 text-gray-300" />
-              <p>Analiz edilecek yeterli sınav verisi bulunamadı.</p>
+        {/* At-Risk Students List (Takes 1 column) */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:col-span-1 flex flex-col h-full">
+          <div className="flex items-center gap-2 mb-6 border-b pb-4">
+            <AlertTriangle className="w-6 h-6 text-red-500" />
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">Düşüşteki Öğrenciler</h2>
+              <p className="text-xs text-gray-500">Son sınavda %15'ten fazla düşüş yaşayanlar</p>
             </div>
-          )}
+          </div>
+          
+          <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+            {atRiskStudents.length > 0 ? (
+              atRiskStudents.map((student) => (
+                <div key={student.student_id} className="bg-red-50 rounded-xl p-4 border border-red-100 flex flex-col gap-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-gray-900 text-sm">{student.full_name}</h4>
+                      <span className="text-xs font-medium text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+                        {student.class_name}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-red-600 font-bold text-lg">-%{student.drop_percent}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-xs mt-2 text-gray-600 border-t border-red-200/50 pt-2">
+                    <span title="Genel Ortalama Net">Ort: <b>{student.avg_net}</b></span>
+                    <span title="Son Sınav Neti">Son: <b>{student.last_net}</b></span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3 py-10">
+                <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
+                  <span className="text-green-500 text-2xl">✓</span>
+                </div>
+                <p className="text-sm text-center">Harika! Ciddi düşüş yaşayan<br/>öğrenci bulunmuyor.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Weak Topics Horizontal Bar Chart (Takes 2 columns) */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:col-span-2">
+          <div className="flex items-center gap-2 mb-8">
+            <TrendingDown className="w-6 h-6 text-orange-500" />
+            <h2 className="text-xl font-bold text-gray-800">Kurum Geneli En Zayıf Kazanımlar</h2>
+          </div>
+          
+          <div className="h-[450px] w-full">
+            {weakTopics.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={weakTopics}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f3f4f6" />
+                  <XAxis 
+                    type="number" 
+                    domain={[0, 100]} 
+                    tickFormatter={(val) => `%${val}`}
+                    tick={{fill: '#6b7280', fontSize: 12}}
+                  />
+                  <YAxis 
+                    type="category" 
+                    dataKey="displayName" 
+                    width={150} 
+                    tick={{fill: '#4b5563', fontSize: 12, fontWeight: 500}} 
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<CustomTooltip />} cursor={{fill: '#f9fafb'}} />
+                  <Bar 
+                    dataKey="success_rate" 
+                    radius={[0, 4, 4, 0]} 
+                    barSize={24}
+                    animationDuration={1500}
+                  >
+                    {weakTopics.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={entry.success_rate < 30 ? '#ef4444' : entry.success_rate < 50 ? '#f97316' : '#eab308'} 
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3">
+                <AlertTriangle className="w-12 h-12 text-gray-300" />
+                <p>Analiz edilecek yeterli sınav verisi bulunamadı.</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
