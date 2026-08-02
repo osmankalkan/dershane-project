@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, User, BarChart2, BookOpen, Target, AlertCircle, Medal } from 'lucide-react';
+import { ArrowLeft, User, BarChart2, BookOpen, Target, AlertCircle, Medal, Download } from 'lucide-react';
 import apiClient from '../api/client';
 import PerformanceLineChart from '../components/charts/PerformanceLineChart';
 import SubjectRadarChart from '../components/charts/SubjectRadarChart';
@@ -149,6 +149,28 @@ export default function StudentDetail() {
               </div>
             </div>
           )}
+          
+          <button
+            onClick={async () => {
+              try {
+                const response = await apiClient.get(`/students/${id}/export`, { responseType: 'blob' });
+                const url = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', `karne_${id}.xlsx`);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+              } catch (err) {
+                console.error("Excel indirme hatası:", err);
+                alert("Karne indirilirken bir hata oluştu.");
+              }
+            }}
+            className="inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Karne (Excel) İndir
+          </button>
         </div>
       </div>
 

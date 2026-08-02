@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, ChevronRight, Search, Filter } from 'lucide-react';
+import { Users, ChevronRight, Search, Filter, Download } from 'lucide-react';
 import apiClient from '../api/client';
 
 export default function StudentsList() {
@@ -8,6 +8,7 @@ export default function StudentsList() {
   const [classes, setClasses] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Sınıfları çek
@@ -40,6 +41,25 @@ export default function StudentsList() {
     fetchStudents();
   }, [selectedClassId]);
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const response = await apiClient.get('/students/export', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'ogrenciler.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error("Excel indirme hatası:", err);
+      alert("Excel dosyası indirilirken bir hata oluştu.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const filteredStudents = students.filter(s => 
     s.full_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     (s.student_code && s.student_code.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -56,17 +76,28 @@ export default function StudentsList() {
           <p className="mt-1 text-sm text-gray-500">Sisteme kayıtlı tüm öğrencilerin listesi ve analizleri</p>
         </div>
         
-        <div className="relative w-full sm:w-72">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-gray-400" />
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <div className="relative w-full sm:w-64">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors sm:text-sm"
+              placeholder="İsim veya Kod ile ara..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <input
-            type="text"
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors sm:text-sm"
-            placeholder="İsim veya Kod ile ara..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            {exporting ? 'İndiriliyor...' : "Excel'e Aktar"}
+          </button>
         </div>
       </div>
 

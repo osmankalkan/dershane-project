@@ -28,6 +28,28 @@ def get_students(
 
 
 @router.get(
+    "/export",
+    summary="Öğrenci Listesini İndir",
+    description="Tüm öğrencilerin genel başarı durumlarını Excel olarak indirir.",
+)
+def export_students_list(
+    db: Session = Depends(get_session),
+):
+    from fastapi.responses import Response
+
+    from app.services.excel_report_service import ExcelReportService
+
+    service = ExcelReportService(db)
+    excel_bytes = service.generate_student_list_excel()
+
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=ogrenciler.xlsx"},
+    )
+
+
+@router.get(
     "/{student_id}",
     status_code=status.HTTP_200_OK,
     summary="Öğrenci Detayı",
@@ -64,3 +86,29 @@ def get_student_results(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Öğrenci bulunamadı.")
 
     return service.get_student_results(student_id)
+
+
+@router.get(
+    "/{student_id}/export",
+    summary="Öğrenci Karne İndir",
+    description="Öğrencinin detaylı karnesini Excel formatında indirir.",
+)
+def export_student_detail(
+    student_id: uuid.UUID,
+    db: Session = Depends(get_session),
+):
+    from fastapi.responses import Response
+
+    from app.services.excel_report_service import ExcelReportService
+
+    service = ExcelReportService(db)
+    try:
+        excel_bytes = service.generate_student_detail_excel(student_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Öğrenci bulunamadı.")
+
+    return Response(
+        content=excel_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=karne_{student_id}.xlsx"},
+    )
