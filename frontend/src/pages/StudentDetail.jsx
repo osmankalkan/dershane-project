@@ -16,7 +16,7 @@ export default function StudentDetail() {
     const fetchData = async () => {
       try {
         const [studentRes, resultsRes, perfRes] = await Promise.all([
-          apiClient.get(`/students/${id}`),
+          apiClient.get(`/students/${id}/`),
           apiClient.get(`/students/${id}/results`),
           apiClient.get(`/analytics/students/${id}/performance`)
         ]);

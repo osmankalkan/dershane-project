@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Upload, Users, GraduationCap } from 'lucide-react';
+import { Upload, Users, GraduationCap, LayoutDashboard } from 'lucide-react';
 
 export default function Layout({ children }) {
   const location = useLocation();
@@ -26,9 +26,20 @@ export default function Layout({ children }) {
               {/* Navigation Links */}
               <nav className="ml-8 flex space-x-8">
                 <Link
-                  to="/"
+                  to="/dashboard"
                   className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors
-                    ${isActive('/upload') || location.pathname === '/' 
+                    ${isActive('/dashboard') || location.pathname === '/' 
+                      ? 'border-blue-500 text-gray-900' 
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    }`}
+                >
+                  <LayoutDashboard className="w-4 h-4 mr-2" />
+                  Kurum Paneli
+                </Link>
+                <Link
+                  to="/upload"
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors
+                    ${isActive('/upload')
                       ? 'border-blue-500 text-gray-900' 
                       : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                     }`}

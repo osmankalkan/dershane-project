@@ -16,8 +16,8 @@ export default function UploadPage() {
 
     const formData = new FormData();
     formData.append('file', file);
-    // Hardcoded institution_id ve date MVP için
-    formData.append('institution_id', 'inst-001');
+    // Hardcoded institution_id ve date MVP için (geçerli UUID)
+    formData.append('institution_id', 'b9c954c0-b532-4051-b830-639a98aecde1');
     formData.append('exam_date', new Date().toISOString().split('T')[0]);
 
     try {

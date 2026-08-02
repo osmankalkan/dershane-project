@@ -771,6 +771,7 @@ Proje süreçleri, kullanıcı ile mutabık kalınan aşağıdaki daha granüler
 
 ### Faz 6: React (Tamamlandı ✅)
 - Vite + TailwindCSS + React Router mimarisi ile profesyonel bir web projesi iskeleti oluşturuldu. Recharts ve shadcn tarzı premium komponentler eklendi.
+> **ÖNEMLİ NOT (CORS):** Geliştirme ortamında (Dev) CORS hatalarını ve 307 Redirect sorunlarını aşmak için `vite.config.js` proxy ayarı kullanılmıştır (Tüm `/api` istekleri Vite üzerinden Backend'e yönlendiriliyor). Production'a (Canlı ortama) geçildiğinde, FastAPI tarafında `CORSMiddleware` `allow_origins` ayarlarıyla gerçek ve güvenli bir CORS yapılandırması yapılmalıdır.
 
 ### Faz 7: PDF upload sistemi (gelişmiş) (Tamamlandı ✅)
 - Arayüzde `react-dropzone` kullanılarak animasyonlu, drag & drop özellikli dosya yükleme ekranı (UploadPage) geliştirildi. API tarafındaki SHA-256 kopya tespiti UI üzerinden başarılı / hatalı olarak ekrana yansıtıldı.
@@ -778,8 +779,8 @@ Proje süreçleri, kullanıcı ile mutabık kalınan aşağıdaki daha granüler
 ### Faz 8: Öğrenci analitik ekranları (Bekliyor)
 - Bireysel bazda başarı trendleri, ders/konu kırılımlı grafik API'lerinin ve arayüzlerinin yazılması.
 
-### Faz 9: Kurum geneli analitik (Bekliyor)
-- Sınıf/Kurum bazında başarı ortalamaları, zümre/ders raporları.
+### Faz 9: Kurum geneli analitik (Tamamlandı ✅)
+- Sınıf/Kurum bazında başarı ortalamalarını ve en zayıf kazanımları gösteren Kurum Paneli (Dashboard) ekranı ve `/institutions/{id}/weak-topics` API'si geliştirildi.
 
 ### Faz 10: Test + güvenlik (Auth, RBAC) (Bekliyor)
 - Sisteme giriş yapabilen kullanıcı rolleri, JWT korumalı token'lar.

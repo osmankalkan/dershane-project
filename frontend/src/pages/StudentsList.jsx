@@ -11,7 +11,7 @@ export default function StudentsList() {
   useEffect(() => {
     const fetchStudents = async () => {
       try {
-        const res = await apiClient.get('/students');
+        const res = await apiClient.get('/students/');
         setStudents(res.data);
       } catch (err) {
         console.error("API Hatası:", err);

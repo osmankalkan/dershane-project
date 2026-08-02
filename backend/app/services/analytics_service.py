@@ -45,6 +45,7 @@ class AnalyticsService:
                 func.sum(Result.blank).label("total_blank"),
                 func.sum(Result.total_questions).label("total_q"),
             )
+            .select_from(Result)
             .join(Exam, Result.exam_id == Exam.id)
             .join(LearningOutcome, Result.learning_outcome_id == LearningOutcome.id)
             .join(Topic, LearningOutcome.topic_id == Topic.id)
@@ -110,6 +111,7 @@ class AnalyticsService:
                 func.sum(Result.correct).label("total_correct"),
                 func.sum(Result.total_questions).label("total_q"),
             )
+            .select_from(Result)
             .join(Exam, Result.exam_id == Exam.id)
             .join(LearningOutcome, Result.learning_outcome_id == LearningOutcome.id)
             .join(Topic, LearningOutcome.topic_id == Topic.id)
