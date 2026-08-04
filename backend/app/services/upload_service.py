@@ -40,6 +40,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import SYSTEM_USER_ID
 from app.models.exam import Exam, LearningOutcome, Subject, Topic
+from app.models.institution import Class
 from app.models.raw_file import (
     RawExtraction,
     RawFile,
@@ -286,12 +287,16 @@ class UploadService:
         # ── Her öğrenci için ────────────────────────────────────────────────
         for s_data in student_results:
             student = self._get_or_create_student(
-                class_id=class_id,
+                institution_id=institution_id,
+                default_class_id=class_id,
                 full_name=s_data.get("full_name", ""),
                 student_code=s_data.get("student_code") or None,
+                raw_class_name=s_data.get("student_class"),
             )
 
             # ── Her subject_result satırı için ──────────────────────────────
+            student_results_map: dict[Any, Result] = {}
+
             for row in s_data.get("subject_results", []):
                 measured = row.get("measured", True)
                 total_q = row.get("total_questions", 0)
@@ -308,18 +313,33 @@ class UploadService:
                     outcome_description=row.get("outcome_description", ""),
                 )
 
-                result = Result(
-                    student_id=student.id,
-                    exam_id=exam.id,
-                    learning_outcome_id=learning_outcome.id,
-                    correct=max(0, row.get("correct", 0)),
-                    wrong=max(0, row.get("wrong", 0)),
-                    blank=max(0, row.get("blank", 0)),
-                    total_questions=max(1, total_q) if measured else 1,
-                    measured=measured,
-                )
-                self._db.add(result)
-                total_result_count += 1
+                c = max(0, row.get("correct", 0))
+                w = max(0, row.get("wrong", 0))
+                b = max(0, row.get("blank", 0))
+                t_q = max(1, total_q) if measured else 1
+
+                if learning_outcome.id in student_results_map:
+                    existing = student_results_map[learning_outcome.id]
+                    existing.correct += c
+                    existing.wrong += w
+                    existing.blank += b
+                    if measured:
+                        existing.total_questions += t_q
+                    existing.measured = existing.measured or measured
+                else:
+                    res = Result(
+                        student_id=student.id,
+                        exam_id=exam.id,
+                        learning_outcome_id=learning_outcome.id,
+                        correct=c,
+                        wrong=w,
+                        blank=b,
+                        total_questions=t_q,
+                        measured=measured,
+                    )
+                    student_results_map[learning_outcome.id] = res
+                    self._db.add(res)
+                    total_result_count += 1
 
         # ── raw_files.status güncelle ──────────────────────────────────────
         raw_file.status = RawFileStatus.PROCESSED
@@ -385,35 +405,76 @@ class UploadService:
     def _get_or_create_student(
         self,
         *,
-        class_id: uuid.UUID,
+        institution_id: uuid.UUID,
+        default_class_id: uuid.UUID,
         full_name: str,
         student_code: str | None,
+        raw_class_name: str | None = None,
     ) -> Student:
-        """Öğrenciyi bul veya oluştur.
+        """Öğrenciyi ve sınıfını esnek bir şekilde bulur veya oluşturur.
 
-        Eşleştirme önceliği:
-          1. student_code varsa: class_id + student_code çifti (unique)
-          2. student_code yoksa: class_id + full_name (isim bazlı eşleşme)
+        PDF'te okunabilmiş bir sınıf adı (örn: '8/EG3', '8-A') varsa kurum altında
+        o sınıfı arar veya oluşturur; yoksa default_class_id kullanılır.
         """
+        target_class_id = default_class_id
+
+        if raw_class_name and raw_class_name.strip():
+            clean_name = raw_class_name.strip()
+            cls = self._db.query(Class).filter(Class.institution_id == institution_id, Class.name.ilike(clean_name)).first()
+            if not cls:
+                cls = Class(
+                    institution_id=institution_id,
+                    name=clean_name,
+                    academic_year="2024-2025",
+                )
+                self._db.add(cls)
+                self._db.flush()
+            target_class_id = cls.id
+
+        # 1. Önce student_code varsa arama yap
         if student_code:
-            student = self._db.query(Student).filter_by(class_id=class_id, student_code=student_code).first()
-            if student:
+            student = self._db.query(Student).filter_by(class_id=target_class_id, student_code=student_code).first()
+            if not student:
+                # Kurumun diğer sınıflarında aynı kod var mı?
+                student = (
+                    self._db.query(Student)
+                    .join(Class)
+                    .filter(Class.institution_id == institution_id, Student.student_code == student_code)
+                    .first()
+                )
+                if student:
+                    student.class_id = target_class_id
+                    self._db.flush()
+                    return student
+            else:
                 return student
 
-        # İsim bazlı arama (student_code yoksa veya bulunamadıysa)
-        student = self._db.query(Student).filter_by(class_id=class_id, full_name=full_name).first()
+        # 2. İsim bazlı arama (Kurum geneli veya hedef sınıf)
+        student = self._db.query(Student).filter_by(class_id=target_class_id, full_name=full_name).first()
+        if not student:
+            student = (
+                self._db.query(Student)
+                .join(Class)
+                .filter(Class.institution_id == institution_id, Student.full_name == full_name)
+                .first()
+            )
+            if student:
+                student.class_id = target_class_id
+                self._db.flush()
+                return student
+
         if student:
             return student
 
-        # Yeni öğrenci oluştur
+        # 3. Yeni öğrenci oluştur
         student = Student(
-            class_id=class_id,
+            class_id=target_class_id,
             full_name=full_name,
             student_code=student_code,
         )
         self._db.add(student)
         self._db.flush()
-        logger.debug("Yeni öğrenci oluşturuldu: %s", full_name)
+        logger.debug("Yeni öğrenci oluşturuldu: %s (Sınıf: %s)", full_name, target_class_id)
         return student
 
     def _get_or_create_learning_outcome(
@@ -486,8 +547,13 @@ class UploadService:
         return hashlib.sha256(data).hexdigest()
 
     def _find_duplicate(self, file_hash: str) -> RawFile | None:
-        """Aynı hash'e sahip daha önce yüklenmiş dosyayı arar."""
-        return self._db.query(RawFile).filter_by(file_hash=file_hash).first()
+        """Aynı hash'e sahip daha önce yüklenmiş ve hala aktif bir sınavla ilişkili dosyayı arar."""
+        raw_files = self._db.query(RawFile).filter_by(file_hash=file_hash).all()
+        for rf in raw_files:
+            exam = self._db.query(Exam).filter_by(raw_file_id=rf.id).first()
+            if exam:
+                return rf
+        return None
 
     def _find_logical_duplicate(self, institution_id: uuid.UUID, exam_name: str, exam_date: date) -> RawFile | None:
         """Aynı kurumda, aynı ad ve tarihle daha önce yüklenmiş başarılı bir sınav (RawFile) arar."""

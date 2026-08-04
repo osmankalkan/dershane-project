@@ -31,7 +31,7 @@ export default function TopicBreakdownBar({ topicData }) {
         <Tooltip
           cursor={{ fill: '#f9fafb' }}
           contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-          formatter={(value) => [`%${value.toFixed(1)}`, 'Başarı Yüzdesi']}
+          formatter={(value) => [`%${value != null && value.toFixed ? value.toFixed(1) : (value ?? 0)}`, 'Başarı Yüzdesi']}
         />
         <Bar dataKey="success_rate" radius={[0, 4, 4, 0]} barSize={24}>
           {topicData.map((entry, index) => (

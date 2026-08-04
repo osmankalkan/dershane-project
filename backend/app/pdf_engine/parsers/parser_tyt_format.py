@@ -177,7 +177,9 @@ class ParserTYTFormat(BasePDFParser):
                 if not pdf.pages:
                     return False
                 first_page_text = pdf.pages[0].extract_text() or ""
-                return _SINAV_BELGESI_MARKER in first_page_text
+                return _SINAV_BELGESI_MARKER in first_page_text and not any(
+                    k in first_page_text for k in ["LGS", "8.SINIF", "MADALYON"]
+                )
         except Exception:  # noqa: BLE001
             return False
 

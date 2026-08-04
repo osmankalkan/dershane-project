@@ -57,65 +57,73 @@ export default function StudentDetail() {
           <Link to="/students" className="mt-4 inline-block text-blue-600 hover:underline">Listeye Dön</Link>
         </div>
       </div>
-    );
-  }
+    );  // --- DATA PREPARATION FOR CHARTS ---
 
-  // --- DATA PREPARATION FOR CHARTS ---
-  
   // 1. Line Chart Data (Net Trend)
-  const lineChartData = performance.map(exam => {
-    const dataPoint = { name: exam.exam_name };
-    exam.subjects.forEach(sub => {
-      dataPoint[sub.subject_name] = sub.net;
+  const lineChartData = (performance || []).map((exam) => {
+    const dataPoint = { name: exam?.exam_name || 'Sınav' };
+    (exam?.subjects || []).forEach((sub) => {
+      if (sub?.subject_name) {
+        dataPoint[sub.subject_name] = sub.net ?? 0;
+      }
     });
     return dataPoint;
   });
-  
+
   const subjectNames = new Set();
-  performance.forEach(exam => {
-    exam.subjects.forEach(sub => subjectNames.add(sub.subject_name));
+  (performance || []).forEach((exam) => {
+    (exam?.subjects || []).forEach((sub) => {
+      if (sub?.subject_name) subjectNames.add(sub.subject_name);
+    });
   });
   const subjects = Array.from(subjectNames);
 
   // 2. Radar Chart Data (Latest Subject Proficiency)
   const radarData = [];
-  if (performance.length > 0) {
-    // Get the latest exam's subjects
+  if (Array.isArray(performance) && performance.length > 0) {
     const latestExam = performance[performance.length - 1];
-    latestExam.subjects.forEach(sub => {
-      radarData.push({
-        subject: sub.subject_name,
-        success_rate: sub.success_rate,
-        fullMark: 100
-      });
+    (latestExam?.subjects || []).forEach((sub) => {
+      if (sub?.subject_name) {
+        radarData.push({
+          subject: sub.subject_name,
+          success_rate: sub.success_rate ?? 0,
+          fullMark: 100,
+        });
+      }
     });
   }
 
   // 3. Topic Breakdown Bar Data (Weakest Topics overall)
   const topicStats = {};
-  results.forEach(r => {
-    if (!topicStats[r.topic_name]) {
-      topicStats[r.topic_name] = { correct: 0, total: 0 };
+  (results || []).forEach((r) => {
+    if (!r?.measured) return; // Skip unmeasured outcomes
+    const topicKey = r.topic_name || r.outcome_description || 'Genel';
+    if (!topicStats[topicKey]) {
+      topicStats[topicKey] = { correct: 0, total: 0 };
     }
-    topicStats[r.topic_name].correct += r.correct;
-    topicStats[r.topic_name].total += r.total_questions;
+    topicStats[topicKey].correct += r.correct || 0;
+    topicStats[topicKey].total += r.total_questions || 0;
   });
 
-  const topicData = Object.keys(topicStats).map(topic => {
-    const stat = topicStats[topic];
-    return {
-      topic,
-      success_rate: stat.total > 0 ? (stat.correct / stat.total) * 100 : 0
-    };
-  }).sort((a, b) => a.success_rate - b.success_rate).slice(0, 5); // Take bottom 5 weakest topics
-
-  // ------------------------------------
+  const topicData = Object.keys(topicStats)
+    .map((topic) => {
+      const stat = topicStats[topic];
+      return {
+        topic,
+        success_rate: stat.total > 0 ? (stat.correct / stat.total) * 100 : 0,
+      };
+    })
+    .sort((a, b) => a.success_rate - b.success_rate)
+    .slice(0, 5);
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-8">
       {/* Header & Breadcrumb */}
       <div>
-        <Link to="/students" className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-blue-600 mb-4 transition-colors">
+        <Link
+          to="/students"
+          className="inline-flex items-center text-sm font-medium text-gray-500 hover:text-blue-600 mb-4 transition-colors"
+        >
           <ArrowLeft className="w-4 h-4 mr-1" />
           Öğrenci Listesine Dön
         </Link>
@@ -125,11 +133,13 @@ export default function StudentDetail() {
               <User className="w-8 h-8" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{student?.full_name}</h1>
-              <p className="text-gray-500 font-medium mt-1">Sınıf: {student?.class_name} • Kod: {student?.student_code || 'Belirtilmemiş'}</p>
+              <h1 className="text-3xl font-bold text-gray-900">{student?.full_name || 'Öğrenci'}</h1>
+              <p className="text-gray-500 font-medium mt-1">
+                Sınıf: {student?.class_name || 'Belirtilmemiş'} • Kod: {student?.student_code || 'Belirtilmemiş'}
+              </p>
             </div>
           </div>
-          
+
           {/* Ranking Badge */}
           {ranking && ranking.total_in_institution > 0 && (
             <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
@@ -139,17 +149,23 @@ export default function StudentDetail() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase">Kurum Derecesi</p>
-                  <p className="text-lg font-bold text-gray-900">{ranking.rank_in_institution} <span className="text-sm font-normal text-gray-500">/ {ranking.total_in_institution}</span></p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {ranking.rank_in_institution}{' '}
+                    <span className="text-sm font-normal text-gray-500">/ {ranking.total_in_institution}</span>
+                  </p>
                 </div>
               </div>
               <div className="w-px h-10 bg-gray-200 mx-2"></div>
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase">Sınıf Derecesi</p>
-                <p className="text-lg font-bold text-gray-900">{ranking.rank_in_class} <span className="text-sm font-normal text-gray-500">/ {ranking.total_in_class}</span></p>
+                <p className="text-lg font-bold text-gray-900">
+                  {ranking.rank_in_class}{' '}
+                  <span className="text-sm font-normal text-gray-500">/ {ranking.total_in_class}</span>
+                </p>
               </div>
             </div>
           )}
-          
+
           <button
             onClick={async () => {
               try {
@@ -162,8 +178,8 @@ export default function StudentDetail() {
                 link.click();
                 link.remove();
               } catch (err) {
-                console.error("Excel indirme hatası:", err);
-                alert("Karne indirilirken bir hata oluştu.");
+                console.error('Excel indirme hatası:', err);
+                alert('Karne indirilirken bir hata oluştu.');
               }
             }}
             className="inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
@@ -176,7 +192,6 @@ export default function StudentDetail() {
 
       {/* Grid Layout for Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
         {/* Main Line Chart (Spans 2 columns) */}
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-200 p-6 relative overflow-hidden flex flex-col">
           <div className="absolute top-0 right-0 p-32 bg-blue-50/50 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
@@ -191,7 +206,6 @@ export default function StudentDetail() {
 
         {/* Right Column Stack */}
         <div className="flex flex-col gap-6">
-          
           {/* Radar Chart */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col">
             <div className="flex items-center gap-2 mb-2">
@@ -215,7 +229,6 @@ export default function StudentDetail() {
               <TopicBreakdownBar topicData={topicData} />
             </div>
           </div>
-          
         </div>
       </div>
 
@@ -225,53 +238,102 @@ export default function StudentDetail() {
           <BookOpen className="w-6 h-6 text-indigo-500" />
           <h2 className="text-xl font-bold text-gray-800">Kazanım Detaylı Sınav Sonuçları</h2>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Sınav Adı</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Ders</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase max-w-xs">Konu ve Kazanım</th>
-                <th scope="col" className="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Soru</th>
-                <th scope="col" className="px-3 py-3 text-center text-xs font-semibold text-green-600 uppercase">D</th>
-                <th scope="col" className="px-3 py-3 text-center text-xs font-semibold text-red-600 uppercase">Y</th>
-                <th scope="col" className="px-3 py-3 text-center text-xs font-semibold text-yellow-600 uppercase">B</th>
-                <th scope="col" className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">Net</th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Başarı</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                  Sınav Adı
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                  Ders
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase max-w-xs">
+                  Konu ve Kazanım
+                </th>
+                <th scope="col" className="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase">
+                  Soru
+                </th>
+                <th scope="col" className="px-3 py-3 text-center text-xs font-semibold text-green-600 uppercase">
+                  D
+                </th>
+                <th scope="col" className="px-3 py-3 text-center text-xs font-semibold text-red-600 uppercase">
+                  Y
+                </th>
+                <th scope="col" className="px-3 py-3 text-center text-xs font-semibold text-yellow-600 uppercase">
+                  B
+                </th>
+                <th scope="col" className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase">
+                  Net
+                </th>
+                <th scope="col" className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">
+                  Başarı
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {results.length > 0 ? (
-                results.map((r, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{r.exam_name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-semibold">{r.subject_name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate" title={r.outcome_description}>
-                      <span className="font-medium text-gray-800 block">{r.topic_name}</span>
-                      <span className="text-xs text-gray-500">{r.outcome_description}</span>
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-500">{r.total_questions}</td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium text-green-600">{r.correct}</td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium text-red-600">{r.wrong}</td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium text-yellow-600">{r.blank}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-center font-bold text-gray-900">{r.net}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
-                        ${r.success_rate >= 50 ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}
-                      `}>
-                        %{r.success_rate.toFixed(1)}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                results.map((r, idx) => {
+                  const isMeasured = r?.measured !== false && r?.success_rate !== null && r?.success_rate !== undefined;
+                  return (
+                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                        {r?.exam_name || '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-semibold">
+                        {r?.subject_name || '—'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate" title={r?.outcome_description}>
+                        <span className="font-medium text-gray-800 block">{r?.topic_name || r?.outcome_description}</span>
+                        {r?.topic_name && r?.outcome_description && (
+                          <span className="text-xs text-gray-500">{r?.outcome_description}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-gray-500">
+                        {r?.total_questions ?? 0}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium text-green-600">
+                        {r?.correct ?? 0}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium text-red-600">
+                        {r?.wrong ?? 0}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium text-yellow-600">
+                        {r?.blank ?? 0}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-center font-bold text-gray-900">
+                        {isMeasured && r?.net !== null && r?.net !== undefined ? r.net : '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                            !isMeasured
+                              ? 'bg-gray-100 text-gray-600 border-gray-200'
+                              : (r?.success_rate ?? 0) >= 50
+                              ? 'bg-green-50 text-green-700 border-green-200'
+                              : 'bg-red-50 text-red-700 border-red-200'
+                          }`}
+                        >
+                          {!isMeasured ? 'Ölçülmedi' : `%${Number(r.success_rate).toFixed(1)}`}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan="9" className="px-6 py-10 text-center text-sm text-gray-500">Bu öğrenciye ait sonuç bulunamadı.</td>
+                  <td colSpan="9" className="px-6 py-10 text-center text-sm text-gray-500">
+                    Bu öğrenciye ait sonuç bulunamadı.
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  );e>
         </div>
       </div>
     </div>

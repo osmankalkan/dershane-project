@@ -17,6 +17,7 @@ dikkatlice belirlenmeli.
 from __future__ import annotations
 
 from app.pdf_engine.parsers.base_parser import BasePDFParser
+from app.pdf_engine.parsers.parser_lgs_format import ParserLGSFormat
 from app.pdf_engine.parsers.parser_tyt_format import ParserTYTFormat
 
 # ── Kayıtlı Parser Listesi ────────────────────────────────────────────────────
@@ -26,9 +27,8 @@ from app.pdf_engine.parsers.parser_tyt_format import ParserTYTFormat
 # gerekirse burası değiştirilir.
 
 REGISTERED_PARSERS: list[BasePDFParser] = [
+    ParserLGSFormat(),
     ParserTYTFormat(),
-    # ParserOrtaokulV1(),    ← ortaokul formatı gelince buraya eklenir
-    # ParserYayineviA(),     ← yayınevi A formatı gelince buraya eklenir
 ]
 
 __all__ = ["REGISTERED_PARSERS", "BasePDFParser"]

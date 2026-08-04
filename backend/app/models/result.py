@@ -71,7 +71,7 @@ class Result(UUIDMixin, TimestampMixin, Base):
     )
     exam_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(),
-        ForeignKey("exams.id", ondelete="RESTRICT"),
+        ForeignKey("exams.id", ondelete="CASCADE"),
         nullable=False,
     )
     learning_outcome_id: Mapped[uuid.UUID] = mapped_column(

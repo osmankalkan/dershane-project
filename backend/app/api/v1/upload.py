@@ -51,16 +51,25 @@ def upload_pdf(
             exam_date=exam_date,
         )
 
-        # Eğer duplicate ise 409 Conflict dönebiliriz ama result içinde dönmek daha iyi
         if result.status == "DUPLICATE":
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result.detail)
 
         return result.to_dict()
 
+    except HTTPException:
+        raise
+    except (ValueError, RuntimeError) as ve:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"PDF okuma/işleme hatası: {ve}",
+        )
     except Exception as e:
-        # Eğer engine dışında servisin kendisinde bir hata oluşursa (örneğin DB hatası)
-        # 500 döneriz. Engine içindeki hatalar NEEDS_REVIEW veya FAILED olarak result'a yansır.
+        db.rollback()
         import logging
 
         logging.getLogger(__name__).error(f"Upload error: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="PDF işlenirken sunucu hatası oluştu.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"PDF işlenirken bir hata oluştu: {e}",
+        )

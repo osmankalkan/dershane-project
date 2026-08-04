@@ -18,7 +18,7 @@ export default function SubjectRadarChart({ radarData }) {
         <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
         <Tooltip 
           contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-          formatter={(value) => [`%${value.toFixed(1)}`, 'Başarı Yüzdesi']}
+          formatter={(value) => [`%${value != null && value.toFixed ? value.toFixed(1) : (value ?? 0)}`, 'Başarı Yüzdesi']}
         />
         <Radar
           name="Başarı"
