@@ -12,13 +12,12 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List
 
 import pdfplumber
 
-from app.pdf_engine.parsers.base_parser import BasePDFParser
+from app.pdf_engine.parsers.base_parser import BaseExamParser
 from app.pdf_engine.parsers.parser_tyt_format import (
-    _RIGHT_COLUMN_X_THRESHOLD,
     _SINAV_BELGESI_MARKER,
     _group_words_into_rows,
     _row_to_text,
@@ -59,7 +58,7 @@ _SUBJECT_PREFIXES = (
 )
 
 
-class ParserLGSFormat(BasePDFParser):
+class LGSParser(BaseExamParser):
     parser_name: str = PARSER_NAME
 
     def can_handle(self, pdf_path: Path) -> bool:
@@ -73,7 +72,48 @@ class ParserLGSFormat(BasePDFParser):
         except Exception:
             return False
 
-    def extract(self, pdf_path: Path) -> dict[str, Any]:
+    def parse(self) -> None:
+        if self._parsed:
+            return
+
+        pdf_path = self.pdf_path
+        raw_data = self._extract(pdf_path)
+        self._raw_data = self.normalize(raw_data)
+        self._parsed = True
+
+    def extract_student_info(self) -> List[Dict[str, Any]]:
+        self.parse()
+        students = []
+        for s in self._raw_data.get("student_results", []):
+            students.append(
+                {"student_code": s.get("student_code"), "full_name": s.get("full_name"), "student_class": s.get("student_class")}
+            )
+        return students
+
+    def extract_topics(self) -> List[Dict[str, Any]]:
+        self.parse()
+        topics_dict = {}
+        for s in self._raw_data.get("student_results", []):
+            for r in s.get("subject_results", []):
+                key = (r.get("subject_name"), r.get("outcome_description"))
+                if key not in topics_dict:
+                    topics_dict[key] = {"subject": key[0], "topic": key[1], "questions": r.get("total_questions")}
+        return list(topics_dict.values())
+
+    def extract_results(self) -> List[Dict[str, Any]]:
+        self.parse()
+        results = []
+        for s in self._raw_data.get("student_results", []):
+            results.append(
+                {
+                    "student_code": s.get("student_code"),
+                    "full_name": s.get("full_name"),
+                    "subject_results": s.get("subject_results", []),
+                }
+            )
+        return results
+
+    def _extract(self, pdf_path: Path) -> dict[str, Any]:
         warnings: list[str] = []
         errors: list[str] = []
         raw_students: list[dict[str, Any]] = []
@@ -138,16 +178,27 @@ class ParserLGSFormat(BasePDFParser):
             warnings.append(f"Sayfa {page_num}: kelime bulunamadı, atlandı.")
             return {}, {}, warnings
 
-        left_words = [w for w in words if w["x0"] < _RIGHT_COLUMN_X_THRESHOLD]
-        right_words = [w for w in words if w["x0"] >= _RIGHT_COLUMN_X_THRESHOLD]
+        # 1. Üst Bölge (top < 270.0): Sınav bilgisi, Öğrenci Meta ve Özet Tablo
+        top_words = [w for w in words if w["top"] < 270.0]
+        top_rows = _group_words_into_rows(top_words)
 
-        left_rows = _group_words_into_rows(left_words)
-        right_rows = _group_words_into_rows(right_words)
+        exam_info = self._parse_exam_info(top_rows)
+        student_meta = self._parse_student_meta(top_rows)
+        summary_subjects = self._parse_summary_table(top_rows, warnings)
 
-        exam_info = self._parse_exam_info(left_rows)
-        student_meta = self._parse_student_meta(left_rows)
-        summary_subjects = self._parse_summary_table(left_rows, warnings)
-        analysis_subjects = self._parse_analysis_section(right_rows, warnings)
+        # 2. Analiz Bölgesi (top >= 270.0): 2 Alt-Sütun (x0 = 295.0 eşik değeri)
+        analysis_words = [w for w in words if w["top"] >= 270.0]
+        col1_words = [w for w in analysis_words if w["x0"] < 295.0]
+        col2_words = [w for w in analysis_words if w["x0"] >= 295.0]
+
+        col1_rows = _group_words_into_rows(col1_words)
+        col2_rows = _group_words_into_rows(col2_words)
+
+        outcomes1 = self._parse_analysis_section(col1_rows, warnings)
+        last_subject = outcomes1[-1]["subject_name"] if outcomes1 else ""
+        outcomes2 = self._parse_analysis_section(col2_rows, warnings, initial_subject=last_subject)
+
+        analysis_subjects = outcomes1 + outcomes2
 
         student_raw: dict[str, Any] = {
             **student_meta,
@@ -246,7 +297,7 @@ class ParserLGSFormat(BasePDFParser):
             text = _row_to_text(row)
             if _should_skip_line(text):
                 continue
-            if "DERSLER" in text and "Soru Sayısı" in text:
+            if "DERSLER" in text:
                 in_table = True
                 continue
             if not in_table:
@@ -334,9 +385,17 @@ class ParserLGSFormat(BasePDFParser):
                 return prefix
         return self._detect_analysis_subject_header(text)
 
-    def _parse_analysis_section(self, rows: list[list[dict[str, Any]]], warnings: list[str]) -> list[dict[str, Any]]:
+    def _parse_analysis_section(
+        self,
+        rows: list[list[dict[str, Any]]],
+        warnings: list[str],
+        initial_subject: str = "",
+    ) -> list[dict[str, Any]]:
         outcomes: list[dict[str, Any]] = []
-        current_subject = ""
+        current_subject = initial_subject
+
+        # 1. First pass: identify valid rows and their indentation
+        processed_rows = []
         for row in rows:
             text = _row_to_text(row)
             stripped = text.strip()
@@ -350,9 +409,22 @@ class ParserLGSFormat(BasePDFParser):
                 current_subject = self._clean_subject_name(subject_match)
                 continue
 
-            outcome = self._parse_outcome_row(stripped, current_subject, warnings)
-            if outcome:
-                outcomes.append(outcome)
+            x0 = row[0]["x0"]
+            processed_rows.append((x0, stripped, current_subject))
+
+        # 2. Second pass: filter parents by indentation, only parse leaf nodes
+        for i, (x0, text, subj) in enumerate(processed_rows):
+            is_parent = False
+            if i + 1 < len(processed_rows):
+                next_x0, next_text, next_subj = processed_rows[i + 1]
+                # If the next row is in the same subject and is more indented, this row is a parent
+                if next_subj == subj and next_x0 > x0 + 1.0:
+                    is_parent = True
+
+            if not is_parent:
+                outcome = self._parse_outcome_row(text, subj, warnings)
+                if outcome:
+                    outcomes.append(outcome)
 
         return outcomes
 
@@ -389,6 +461,20 @@ class ParserLGSFormat(BasePDFParser):
         if text.startswith("- "):
             text = text[2:].strip()
 
+        # PDF formatlama hatasından dolayı rakamlar arasına boşluk girebiliyor (örn: "2 2 0 1 0 0")
+        if text.endswith(" 1 0 0"):
+            text = text[:-6] + " 100"
+        elif text.endswith(" 5 0"):
+            text = text[:-4] + " 50"
+        elif text.endswith(" 3 3"):
+            text = text[:-4] + " 33"
+        elif text.endswith(" 6 7"):
+            text = text[:-4] + " 67"
+        elif text.endswith(" 2 5"):
+            text = text[:-4] + " 25"
+        elif text.endswith(" 7 5"):
+            text = text[:-4] + " 75"
+
         tokens = text.split()
         if len(tokens) < 5:
             return None
@@ -401,11 +487,11 @@ class ParserLGSFormat(BasePDFParser):
         except ValueError:
             return None
 
-        if total_q < 0 or correct < 0 or wrong < 0:
+        if total_q <= 0 or total_q > 100 or correct < 0 or wrong < 0:
             return None
 
         description = " ".join(tokens[:-4]).strip()
-        if not description:
+        if not description or re.match(r"^[\d\s\-\.]+$", description) or "1234" in description or "7890" in description:
             return None
 
         blank = total_q - correct - wrong

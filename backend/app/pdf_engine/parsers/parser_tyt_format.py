@@ -20,11 +20,11 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List
 
 import pdfplumber
 
-from app.pdf_engine.parsers.base_parser import BasePDFParser
+from app.pdf_engine.parsers.base_parser import BaseExamParser
 
 # ── Sabitler ──────────────────────────────────────────────────────────────────
 
@@ -156,7 +156,7 @@ def _safe_float(value: str, default: float = 0.0) -> float:
 # ── Ana Parser Sınıfı ─────────────────────────────────────────────────────────
 
 
-class ParserTYTFormat(BasePDFParser):
+class TYTParser(BaseExamParser):
     """TYT sınav sonuç belgesi formatı için PDF parser implementasyonu.
 
     Her çağrı için bir pdfplumber oturumu açar ve kapatır.
@@ -185,7 +185,48 @@ class ParserTYTFormat(BasePDFParser):
 
     # ── extract ───────────────────────────────────────────────────────────────
 
-    def extract(self, pdf_path: Path) -> dict[str, Any]:
+    def parse(self) -> None:
+        if self._parsed:
+            return
+
+        pdf_path = self.pdf_path
+        raw_data = self._extract(pdf_path)
+        self._raw_data = self.normalize(raw_data)
+        self._parsed = True
+
+    def extract_student_info(self) -> List[Dict[str, Any]]:
+        self.parse()
+        students = []
+        for s in self._raw_data.get("student_results", []):
+            students.append(
+                {"student_code": s.get("student_code"), "full_name": s.get("full_name"), "student_class": s.get("student_class")}
+            )
+        return students
+
+    def extract_topics(self) -> List[Dict[str, Any]]:
+        self.parse()
+        topics_dict = {}
+        for s in self._raw_data.get("student_results", []):
+            for r in s.get("subject_results", []):
+                key = (r.get("subject_name"), r.get("outcome_description"))
+                if key not in topics_dict:
+                    topics_dict[key] = {"subject": key[0], "topic": key[1], "questions": r.get("total_questions")}
+        return list(topics_dict.values())
+
+    def extract_results(self) -> List[Dict[str, Any]]:
+        self.parse()
+        results = []
+        for s in self._raw_data.get("student_results", []):
+            results.append(
+                {
+                    "student_code": s.get("student_code"),
+                    "full_name": s.get("full_name"),
+                    "subject_results": s.get("subject_results", []),
+                }
+            )
+        return results
+
+    def _extract(self, pdf_path: Path) -> dict[str, Any]:
         """PDF'ten ham veriyi çeker; normalleştirme yapmaz.
 
         Her sayfa bir öğrenci bloğu olarak işlenir.
@@ -271,6 +312,7 @@ class ParserTYTFormat(BasePDFParser):
                 warnings.append(f"Öğrenci '{name}' normalleştirilemedi: {exc}")
 
         return {
+            "exam_name": raw_exam.get("exam_name", ""),
             "exam_date": raw_exam.get("exam_date", ""),
             "institution_name": raw_exam.get("institution_name", ""),
             "source_format": PARSER_NAME,

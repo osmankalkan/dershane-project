@@ -35,6 +35,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -50,7 +51,8 @@ from app.models.raw_file import (
 )
 from app.models.result import Result
 from app.models.student import Student
-from app.pdf_engine.engine import EngineResult, EngineResultStatus, PDFEngine
+from app.pdf_engine.factory import ParserFactory
+from app.pdf_engine.ocr_fallback import check_pdf_accessibility
 
 logger = logging.getLogger(__name__)
 
@@ -126,10 +128,8 @@ class UploadService:
     def __init__(
         self,
         db: Session,
-        engine: PDFEngine | None = None,
     ) -> None:
         self._db = db
-        self._engine = engine or PDFEngine()
 
     # ── Genel API ─────────────────────────────────────────────────────────────
 
@@ -208,51 +208,47 @@ class UploadService:
         self._db.flush()  # ID üretilsin ama commit etme
         logger.info("raw_file oluşturuldu: id=%s", raw_file.id)
 
-        # ── 3. PDF Engine çalıştır ─────────────────────────────────────────
-        try:
-            eng_result: EngineResult = self._engine.process(saved_path)
-        except Exception as exc:  # noqa: BLE001
-            # Engine kendisi exception fırlatmamalı ama savunma olarak yakala
-            logger.error("Engine beklenmedik hata: %s", exc, exc_info=True)
-            eng_result = EngineResult(
-                status=EngineResultStatus.FAILED,
-                parser_name="UNKNOWN",
-                confidence=0.0,
-                review_reason="EXTRACTION_FAILED",
-                review_detail=f"Engine kritik hata: {exc}",
-            )
+        # ── 3. OCR ve Format Kontrolü ─────────────────────────────────────
+        accessibility = check_pdf_accessibility(saved_path)
+        if accessibility == "CORRUPTED":
+            return self._handle_needs_review(raw_file, None, "UNKNOWN", "CORRUPTED_FILE", "PDF dosyası bozuk veya açılamıyor.")
+        elif accessibility == "IMAGE_BASED":
+            return self._handle_needs_review(raw_file, None, "UNKNOWN", "IMAGE_BASED_PDF", "PDF salt resim içeriyor, OCR gerekli.")
 
-        # ── 4. raw_extractions kaydı oluştur ──────────────────────────────
+        # ── 4. ParserFactory ile Ayrıştırma ────────────────────────────────
+        try:
+            parser = ParserFactory.create_parser(saved_path)
+            parser.parse()
+            student_results = parser.extract_results()
+            parser_name = parser.__class__.__name__
+        except Exception as exc:
+            logger.error("Parser beklenmedik hata: %s", exc, exc_info=True)
+            return self._handle_needs_review(raw_file, None, "UNKNOWN", "EXTRACTION_FAILED", f"Parser kritik hata: {exc}")
+
+        # ── 5. raw_extractions kaydı oluştur ──────────────────────────────
         raw_extraction = RawExtraction(
             raw_file_id=raw_file.id,
-            parser_used=eng_result.parser_name,
-            detected_format=eng_result.parser_name,
-            raw_json=eng_result.raw_data,
-            confidence=eng_result.confidence,
-            warnings=eng_result.warnings or [],
+            parser_used=parser_name,
+            detected_format=parser_name,
+            raw_json={"student_results": student_results},
+            confidence=1.0,
+            warnings=[],
             extracted_at=datetime.now(tz=timezone.utc),
         )
         self._db.add(raw_extraction)
         self._db.flush()
-        logger.info("raw_extraction oluşturuldu: id=%s", raw_extraction.id)
 
-        # ── 5. EngineResult.status'e göre dallanma ────────────────────────
-        if eng_result.status == EngineResultStatus.OK and eng_result.normalized_data:
-            return self._handle_ok(
-                raw_file=raw_file,
-                raw_extraction=raw_extraction,
-                eng_result=eng_result,
-                institution_id=institution_id,
-                class_id=class_id,
-                exam_name=exam_name,
-                exam_date=exam_date,
-            )
-        else:
-            return self._handle_needs_review(
-                raw_file=raw_file,
-                raw_extraction=raw_extraction,
-                eng_result=eng_result,
-            )
+        # ── 6. OK İşlemleri ───────────────────────────────────────────────
+        return self._handle_ok(
+            raw_file=raw_file,
+            raw_extraction=raw_extraction,
+            student_results=student_results,
+            parser_name=parser_name,
+            institution_id=institution_id,
+            class_id=class_id,
+            exam_name=exam_name,
+            exam_date=exam_date,
+        )
 
     # ── Özel: Başarılı işleme ─────────────────────────────────────────────────
 
@@ -261,15 +257,14 @@ class UploadService:
         *,
         raw_file: RawFile,
         raw_extraction: RawExtraction,
-        eng_result: EngineResult,
+        student_results: list[dict],
+        parser_name: str,
         institution_id: uuid.UUID,
         class_id: uuid.UUID,
         exam_name: str,
         exam_date: date,
     ) -> UploadResult:
-        """EngineResult.status == OK → normalized veriyi DB'ye yaz."""
-        normalized = eng_result.normalized_data  # type: ignore[union-attr]
-        student_results: list[dict] = normalized.get("student_results", [])
+        """Parser başarıyla veriyi çıkardı → DB'ye yaz."""
 
         # ── Exam kaydı ──────────────────────────────────────────────────────
         exam = Exam(
@@ -277,7 +272,7 @@ class UploadService:
             raw_file_id=raw_file.id,
             name=exam_name,
             exam_date=exam_date,
-            source_format=eng_result.parser_name,
+            source_format=parser_name,
         )
         self._db.add(exam)
         self._db.flush()
@@ -356,10 +351,10 @@ class UploadService:
         return UploadResult(
             raw_file_id=raw_file.id,
             status="OK",
-            parser_name=eng_result.parser_name,
+            parser_name=parser_name,
             student_count=len(student_results),
             result_count=total_result_count,
-            warnings=eng_result.warnings,
+            warnings=[],
             detail=f"Sınav '{exam_name}' başarıyla işlendi.",
         )
 
@@ -367,16 +362,17 @@ class UploadService:
 
     def _handle_needs_review(
         self,
-        *,
         raw_file: RawFile,
-        raw_extraction: RawExtraction,
-        eng_result: EngineResult,
+        raw_extraction: RawExtraction | None,
+        parser_name: str,
+        review_reason: str,
+        review_detail: str,
     ) -> UploadResult:
-        """EngineResult.status != OK → review_queue'ya ekle."""
+        """Hata durumu → review_queue'ya ekle."""
         review = ReviewQueue(
-            raw_extraction_id=raw_extraction.id,
-            reason=eng_result.review_reason or "UNKNOWN",
-            reason_detail=eng_result.review_detail or "",
+            raw_extraction_id=raw_extraction.id if raw_extraction else None,
+            reason=review_reason,
+            reason_detail=review_detail,
             status=ReviewQueueStatus.PENDING,
         )
         self._db.add(review)
@@ -388,16 +384,16 @@ class UploadService:
         logger.warning(
             "Upload NEEDS_REVIEW: raw_file=%s reason=%s",
             raw_file.id,
-            eng_result.review_reason,
+            review_reason,
         )
 
         return UploadResult(
             raw_file_id=raw_file.id,
             status="NEEDS_REVIEW",
-            parser_name=eng_result.parser_name,
+            parser_name=parser_name,
             review_queue_id=review.id,
-            warnings=eng_result.warnings,
-            detail=eng_result.review_detail or "Dosya insan incelemesine alındı.",
+            warnings=[],
+            detail=review_detail or "Dosya insan incelemesine alındı.",
         )
 
     # ── Özel: get-or-create yardımcıları ────────────────────────────────────
@@ -411,12 +407,8 @@ class UploadService:
         student_code: str | None,
         raw_class_name: str | None = None,
     ) -> Student:
-        """Öğrenciyi ve sınıfını esnek bir şekilde bulur veya oluşturur.
-
-        PDF'te okunabilmiş bir sınıf adı (örn: '8/EG3', '8-A') varsa kurum altında
-        o sınıfı arar veya oluşturur; yoksa default_class_id kullanılır.
-        """
-        target_class_id = default_class_id
+        """Öğrenciyi ve sınıfını esnek bir şekilde bulur veya oluşturur."""
+        target_class_id = None
 
         if raw_class_name and raw_class_name.strip():
             clean_name = raw_class_name.strip()
@@ -430,6 +422,24 @@ class UploadService:
                 self._db.add(cls)
                 self._db.flush()
             target_class_id = cls.id
+        else:
+            # Check if default_class_id is valid AND belongs to this institution
+            cls = self._db.query(Class).filter_by(id=default_class_id, institution_id=institution_id).first()
+            if cls:
+                target_class_id = cls.id
+            else:
+                # Do NOT pick a random class like '8A' or '11F'.
+                # explicitly use/create a generic class to avoid misclassification.
+                cls = self._db.query(Class).filter_by(institution_id=institution_id, name="Genel Sınıf").first()
+                if not cls:
+                    cls = Class(
+                        institution_id=institution_id,
+                        name="Genel Sınıf",
+                        academic_year="2024-2025",
+                    )
+                    self._db.add(cls)
+                    self._db.flush()
+                target_class_id = cls.id
 
         # 1. Önce student_code varsa arama yap
         if student_code:
@@ -477,6 +487,46 @@ class UploadService:
         logger.debug("Yeni öğrenci oluşturuldu: %s (Sınıf: %s)", full_name, target_class_id)
         return student
 
+    @staticmethod
+    def _normalize_subject_name(raw_name: str) -> str:
+        """Ders adını standartlaştırır (örn. 'Matematik-1', 'Matematik.08' → 'Matematik')."""
+        name = raw_name.strip()
+        if not name:
+            return "Genel"
+
+        clean_upper = (
+            name.upper().replace("İ", "I").replace("Ğ", "G").replace("Ü", "U").replace("Ş", "S").replace("Ö", "O").replace("Ç", "C")
+        )
+
+        if "TURKCE" in clean_upper:
+            return "Türkçe"
+        if "MATEMATIK" in clean_upper:
+            return "Matematik"
+        if "FEN" in clean_upper:
+            return "Fen Bilimleri"
+        if "INKILAP" in clean_upper or "ATATURK" in clean_upper:
+            return "T.C. İnkılap Tarihi ve Atatürkçülük"
+        if "INGILIZCE" in clean_upper or "YABANCI" in clean_upper or "ENGLISH" in clean_upper:
+            return "Yabancı Dil"
+        if "DIN" in clean_upper or "DKAB" in clean_upper or "AHLAK" in clean_upper:
+            return "Din Kültürü ve Ahlak Bilgisi"
+        if "SOSYAL" in clean_upper:
+            return "Sosyal Bilgiler"
+        if "TARIH" in clean_upper:
+            return "Tarih"
+        if "COGRAFYA" in clean_upper:
+            return "Coğrafya"
+        if "FELSEFE" in clean_upper:
+            return "Felsefe"
+        if "FIZIK" in clean_upper:
+            return "Fizik"
+        if "KIMYA" in clean_upper:
+            return "Kimya"
+        if "BIYOLOJI" in clean_upper:
+            return "Biyoloji"
+
+        return name
+
     def _get_or_create_learning_outcome(
         self,
         *,
@@ -485,39 +535,102 @@ class UploadService:
         outcome_code: str | None,
         outcome_description: str,
     ) -> LearningOutcome:
-        """Subject→Topic→LearningOutcome zincirini get-or-create ile oluşturur.
+        """Subject→Topic→LearningOutcome zincirini get-or-create ile oluşturur."""
+        if not hasattr(self, "_subject_cache"):
+            self._subject_cache = {}
 
-        Aynı description + topic kombinasyonu varsa mevcut kaydı döner.
-        Bu sayede aynı kazanım birden fazla sınavda tekrar oluşturulmaz.
-        """
-        # ── Subject ──────────────────────────────────────────────────────────
-        subject_name = subject_name.strip() or "Genel"
-        subject = self._db.query(Subject).filter_by(name=subject_name).first()
+        # ── 1. Subject (Get or Create) ──────────────────────────────────────────
+        canonical_subject = self._normalize_subject_name(subject_name)
+        short_code = self._make_short_code(canonical_subject)
+
+        subject = self._subject_cache.get(short_code)
+
         if not subject:
-            short_code = self._make_short_code(subject_name)
-            subject = Subject(name=subject_name, short_code=short_code)
-            self._db.add(subject)
-            self._db.flush()
+            subject = self._db.query(Subject).filter_by(short_code=short_code).first()
+            if not subject:
+                subject = self._db.query(Subject).filter(func.lower(Subject.name) == func.lower(canonical_subject)).first()
+            if not subject:
+                subject = self._db.query(Subject).filter_by(name=subject_name.strip()).first()
 
-        # ── Topic ─────────────────────────────────────────────────────────────
-        topic_name = topic_name.strip() or subject_name
-        topic = self._db.query(Topic).filter_by(subject_id=subject.id, name=topic_name).first()
+        if not subject:
+            try:
+                with self._db.begin_nested():
+                    subject = Subject(name=canonical_subject, short_code=short_code)
+                    self._db.add(subject)
+                    self._db.flush()
+            except Exception:
+                # Unique constraint ihlali olursa (concurrent insert vb.), tekrar oku
+                subject = self._db.query(Subject).filter_by(short_code=short_code).first()
+                if not subject:
+                    subject = self._db.query(Subject).filter(Subject.name == canonical_subject).first()
+                if not subject:
+                    raise
+
+            self._subject_cache[short_code] = subject
+        else:
+            self._subject_cache[short_code] = subject
+            if subject.name != canonical_subject and subject_name.strip() != "Genel":
+                try:
+                    with self._db.begin_nested():
+                        subject.name = canonical_subject
+                        self._db.flush()
+                except Exception:
+                    pass
+
+        # ── 2. Topic (Get or Create) ────────────────────────────────────────────
+        clean_topic_name = topic_name.strip() or canonical_subject
+        topic = (
+            self._db.query(Topic).filter(Topic.subject_id == subject.id, func.lower(Topic.name) == func.lower(clean_topic_name)).first()
+        )
         if not topic:
-            topic = Topic(subject_id=subject.id, name=topic_name)
-            self._db.add(topic)
-            self._db.flush()
+            try:
+                with self._db.begin_nested():
+                    topic = Topic(subject_id=subject.id, name=clean_topic_name)
+                    self._db.add(topic)
+                    self._db.flush()
+            except Exception:
+                topic = (
+                    self._db.query(Topic)
+                    .filter(Topic.subject_id == subject.id, func.lower(Topic.name) == func.lower(clean_topic_name))
+                    .first()
+                )
 
-        # ── LearningOutcome ───────────────────────────────────────────────────
-        description = outcome_description.strip() or topic_name
-        outcome = self._db.query(LearningOutcome).filter_by(topic_id=topic.id, description=description).first()
-        if not outcome:
-            outcome = LearningOutcome(
-                topic_id=topic.id,
-                code=outcome_code,
-                description=description,
+        # ── 3. LearningOutcome (Get or Create) ──────────────────────────────────
+        clean_description = outcome_description.strip() or clean_topic_name
+        outcome = (
+            self._db.query(LearningOutcome)
+            .filter(
+                LearningOutcome.topic_id == topic.id,
+                func.lower(LearningOutcome.description) == func.lower(clean_description),
             )
-            self._db.add(outcome)
-            self._db.flush()
+            .first()
+        )
+        if not outcome:
+            try:
+                with self._db.begin_nested():
+                    outcome = LearningOutcome(
+                        topic_id=topic.id,
+                        code=outcome_code,
+                        description=clean_description,
+                    )
+                    self._db.add(outcome)
+                    self._db.flush()
+            except Exception:
+                outcome = (
+                    self._db.query(LearningOutcome)
+                    .filter(
+                        LearningOutcome.topic_id == topic.id,
+                        func.lower(LearningOutcome.description) == func.lower(clean_description),
+                    )
+                    .first()
+                )
+        elif outcome_code and not outcome.code:
+            try:
+                with self._db.begin_nested():
+                    outcome.code = outcome_code
+                    self._db.flush()
+            except Exception:
+                pass
 
         return outcome
 
@@ -565,13 +678,8 @@ class UploadService:
 
     @staticmethod
     def _make_short_code(name: str) -> str:
-        """Ders adından kısa kod üretir: 'Matematik-1' → 'MAT1' (maks 10 chr).
-
-        Çakışma durumunda UUID suffix eklenir.
-        """
-        # Türkçe karakterleri ASCII'ye çevir
+        """Ders adından kısa kod üretir: 'Matematik' → 'MATEMATI'."""
         replacements = str.maketrans("ÇçĞğİıÖöŞşÜü", "CcGgIiOoSsUu")
         cleaned = name.translate(replacements)
-        # Sadece harf ve rakam bırak, büyük harf yap
         code = "".join(c for c in cleaned.upper() if c.isalnum())[:8]
         return code or "GEN"
