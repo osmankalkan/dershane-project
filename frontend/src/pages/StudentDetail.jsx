@@ -57,7 +57,10 @@ export default function StudentDetail() {
           <Link to="/students" className="mt-4 inline-block text-blue-600 hover:underline">Listeye Dön</Link>
         </div>
       </div>
-    );  // --- DATA PREPARATION FOR CHARTS ---
+    );
+  }
+
+  // --- DATA PREPARATION FOR CHARTS ---
 
   // 1. Line Chart Data (Net Trend)
   const lineChartData = (performance || []).map((exam) => {
@@ -330,10 +333,6 @@ export default function StudentDetail() {
               )}
             </tbody>
           </table>
-        </div>
-      </div>
-    </div>
-  );e>
         </div>
       </div>
     </div>

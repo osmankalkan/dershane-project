@@ -29,11 +29,14 @@ export default function Dashboard() {
         });
 
         // Veriyi grafik için hazırla, uzun metinleri kısalt
-        const formattedTopics = (weakTopicsRes.data || []).map(topic => ({
-          ...topic,
-          displayName: topic.topic_name.length > 25 ? topic.topic_name.substring(0, 25) + '...' : topic.topic_name,
-          success_rate: Number(topic.success_rate)
-        }));
+        const formattedTopics = (weakTopicsRes.data || []).map(topic => {
+          const topicName = topic.topic_name || "Bilinmeyen Konu";
+          return {
+            ...topic,
+            displayName: topicName.length > 25 ? topicName.substring(0, 25) + '...' : topicName,
+            success_rate: Number(topic.success_rate)
+          };
+        });
 
         setWeakTopics(formattedTopics);
         setAtRiskStudents(atRiskRes.data || []);
@@ -72,13 +75,13 @@ export default function Dashboard() {
       const data = payload[0].payload;
       return (
         <div className="bg-white p-4 rounded-lg shadow-lg border border-gray-100 max-w-xs">
-          <p className="font-bold text-gray-800 border-b pb-2 mb-2">{data.subject_name}</p>
-          <p className="text-sm font-semibold text-gray-700">{data.topic_name}</p>
-          <p className="text-xs text-gray-500 mt-1 italic">{data.outcome_description}</p>
+          <p className="font-bold text-gray-800 border-b pb-2 mb-2">{data?.subject_name}</p>
+          <p className="text-sm font-semibold text-gray-700">{data?.topic_name}</p>
+          <p className="text-xs text-gray-500 mt-1 italic">{data?.outcome_description}</p>
           <div className="mt-3 pt-2 border-t flex justify-between items-center">
             <span className="text-sm text-gray-600">Başarı Oranı:</span>
-            <span className={`font-bold ${data.success_rate < 40 ? 'text-red-600' : 'text-orange-500'}`}>
-              %{data.success_rate}
+            <span className={`font-bold ${data?.success_rate < 40 ? 'text-red-600' : 'text-orange-500'}`}>
+              %{data?.success_rate}
             </span>
           </div>
         </div>
@@ -141,18 +144,18 @@ export default function Dashboard() {
                 <div key={student.student_id} className="bg-red-50 rounded-xl p-4 border border-red-100 flex flex-col gap-2">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h4 className="font-bold text-gray-900 text-sm">{student.full_name}</h4>
+                      <h4 className="font-bold text-gray-900 text-sm">{student?.full_name}</h4>
                       <span className="text-xs font-medium text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
-                        {student.class_name}
+                        {student?.class_name}
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-red-600 font-bold text-lg">-%{student.drop_percent}</span>
+                      <span className="text-red-600 font-bold text-lg">-%{student?.drop_percent}</span>
                     </div>
                   </div>
                   <div className="flex justify-between text-xs mt-2 text-gray-600 border-t border-red-200/50 pt-2">
-                    <span title="Genel Ortalama Net">Ort: <b>{student.avg_net}</b></span>
-                    <span title="Son Sınav Neti">Son: <b>{student.last_net}</b></span>
+                    <span title="Genel Ortalama Net">Ort: <b>{student?.avg_net}</b></span>
+                    <span title="Son Sınav Neti">Son: <b>{student?.last_net}</b></span>
                   </div>
                 </div>
               ))

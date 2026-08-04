@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { UploadCloud, CheckCircle, AlertCircle, FileText, Loader2 } from 'lucide-react';
 import apiClient from '../api/client';
@@ -6,6 +6,18 @@ import apiClient from '../api/client';
 export default function UploadPage() {
   const [uploadStatus, setUploadStatus] = useState(null); // 'uploading', 'success', 'error', 'duplicate'
   const [message, setMessage] = useState('');
+  const [nextExamNumber, setNextExamNumber] = useState(1);
+
+  // Sayfa yüklendiğinde mevcut sınav sayısını çekerek sıradaki numarayı bul
+  useEffect(() => {
+    apiClient.get('/exams/')
+      .then(res => {
+        if (res.data && Array.isArray(res.data)) {
+          setNextExamNumber(res.data.length + 1);
+        }
+      })
+      .catch(err => console.error("Sınav listesi alınamadı:", err));
+  }, []);
   
   const onDrop = useCallback(async (acceptedFiles) => {
     const file = acceptedFiles[0];
@@ -19,7 +31,7 @@ export default function UploadPage() {
     // Hardcoded institution_id, class_id ve date MVP için (geçerli UUID)
     formData.append('institution_id', 'b9c954c0-b532-4051-b830-639a98aecde1');
     formData.append('class_id', '123e4567-e89b-12d3-a456-426614174000');
-    formData.append('exam_name', 'Deneme Sınavı 1');
+    formData.append('exam_name', `Deneme Sınavı ${nextExamNumber}`);
     formData.append('exam_date', new Date().toISOString().split('T')[0]);
 
     try {
@@ -34,12 +46,14 @@ export default function UploadPage() {
       } else {
         setUploadStatus('success');
         setMessage('PDF başarıyla işlendi ve veritabanına kaydedildi!');
+        // Başarılı yüklemeden sonra bir sonraki numara için sayacı artır
+        setNextExamNumber(prev => prev + 1);
       }
     } catch (err) {
       setUploadStatus('error');
       setMessage(err.response?.data?.detail || 'Belge yüklenirken beklenmeyen bir hata oluştu.');
     }
-  }, []);
+  }, [nextExamNumber]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

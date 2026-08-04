@@ -49,9 +49,8 @@ class ExcelReportService:
                 results_latest = (
                     self.db.query(Result).filter(Result.student_id == student_id_uuid, Result.exam_id == latest_exam.id).all()
                 )
-                total_c = sum(r.correct for r in results_latest)
-                total_w = sum(r.wrong for r in results_latest)
-                last_net_val = total_c - (total_w * 0.25)
+
+                last_net_val = sum((r.net or 0) for r in results_latest)
                 last_net = f"{last_net_val:.2f}"
 
                 all_results = self.db.query(Result).filter(Result.student_id == student_id_uuid).all()

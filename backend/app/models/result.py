@@ -111,13 +111,24 @@ class Result(UUIDMixin, TimestampMixin, Base):
     # ── Yardımcı özellikler ───────────────────────────────────────────────────
     @property
     def net(self) -> float:
-        """Net puan (YGS/LGS formülü: 1 doğru - 0.25 yanlış).
+        """Net puan hesaplar.
+
+        LGS formatı (3 yanlış 1 doğru) ise çarpan 1/3 (0.33)
+        Diğer formatlar (YKS vb. 4 yanlış 1 doğru) ise çarpan 1/4 (0.25)
 
         measured=False ise net hesaplanamaz; None döner.
         """
         if not self.measured:
             return None  # type: ignore[return-value]
-        return self.correct - (self.wrong * 0.25)
+
+        penalty = 0.25
+        try:
+            if self.exam and self.exam.source_format and "LGS" in self.exam.source_format.upper():
+                penalty = 1.0 / 3.0
+        except Exception:
+            pass
+
+        return self.correct - (self.wrong * penalty)
 
     @property
     def success_rate(self) -> float | None:

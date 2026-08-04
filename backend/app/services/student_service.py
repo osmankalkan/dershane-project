@@ -24,22 +24,25 @@ class StudentService:
 
     def get_all_students(self, limit: int = 100, skip: int = 0, class_id: uuid.UUID | None = None) -> list[dict[str, Any]]:
         """Tüm öğrencileri sayfalamalı olarak listeler. class_id verilirse filtreler. Ortalama net ve sıra hesaplar."""
-        from sqlalchemy import func
+        from sqlalchemy import case, func
 
+        from app.models.exam import Exam
         from app.models.result import Result
 
-        # Calculate avg_net: (sum(correct) - sum(wrong)*0.25) / count(distinct exam_id)
-        # Handle division by zero using nullif or case. In SQLite nullif is supported.
-        total_net_expr = func.sum(Result.correct) - (func.sum(Result.wrong) * 0.25)
+        # Calculate avg_net: LGS format has 3-wrong penalty (1/3), else 0.25
+        penalty_expr = case((Exam.source_format.like("%LGS%"), 1.0 / 3.0), else_=0.25)
+        total_net_expr = func.sum(Result.correct) - func.sum(Result.wrong * penalty_expr)
         distinct_exams_expr = func.count(func.distinct(Result.exam_id))
 
         # In SQLite, if count is 0, we shouldn't divide by it. Since we LEFT JOIN, if there are no results, count is 0.
         # But if there are no results, total_net_expr is NULL. So avg_net will be NULL, which is fine.
-        # However, to be safe: func.coalesce(distinct_exams_expr, 1)
         avg_net_expr = total_net_expr / func.nullif(distinct_exams_expr, 0)
 
         query = (
-            self._db.query(Student, Class, avg_net_expr.label("avg_net")).join(Class).outerjoin(Result, Student.id == Result.student_id)
+            self._db.query(Student, Class, avg_net_expr.label("avg_net"))
+            .join(Class)
+            .outerjoin(Result, Student.id == Result.student_id)
+            .outerjoin(Exam, Result.exam_id == Exam.id)
         )
 
         if class_id:
@@ -63,9 +66,9 @@ class StudentService:
             output.append(
                 {
                     "id": str(student.id),
-                    "full_name": student.full_name,
-                    "student_code": student.student_code,
-                    "class_name": class_obj.name,
+                    "full_name": student.full_name or "İsimsiz Öğrenci",
+                    "student_code": student.student_code or "",
+                    "class_name": class_obj.name if class_obj else "Bilinmeyen Sınıf",
                     "class_id": str(student.class_id),
                     "institution_id": str(class_obj.institution_id),
                     "avg_net": safe_avg_net,

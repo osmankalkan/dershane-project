@@ -211,9 +211,9 @@ class UploadService:
         # ── 3. OCR ve Format Kontrolü ─────────────────────────────────────
         accessibility = check_pdf_accessibility(saved_path)
         if accessibility == "CORRUPTED":
-            return self._handle_needs_review(raw_file, None, "UNKNOWN", "CORRUPTED_FILE", "PDF dosyası bozuk veya açılamıyor.")
+            raise ValueError("PDF dosyası bozuk veya açılamıyor. Lütfen geçerli ve okunabilir bir PDF belgesi yükleyin.")
         elif accessibility == "IMAGE_BASED":
-            return self._handle_needs_review(raw_file, None, "UNKNOWN", "IMAGE_BASED_PDF", "PDF salt resim içeriyor, OCR gerekli.")
+            raise ValueError("PDF salt resim içeriyor. Lütfen metin tabanlı (taranmamış) bir PDF belgesi yükleyin.")
 
         # ── 4. ParserFactory ile Ayrıştırma ────────────────────────────────
         try:
@@ -221,9 +221,11 @@ class UploadService:
             parser.parse()
             student_results = parser.extract_results()
             parser_name = parser.__class__.__name__
+        except ValueError as ve:
+            raise ve
         except Exception as exc:
             logger.error("Parser beklenmedik hata: %s", exc, exc_info=True)
-            return self._handle_needs_review(raw_file, None, "UNKNOWN", "EXTRACTION_FAILED", f"Parser kritik hata: {exc}")
+            raise ValueError(f"Sınav sonuçları ayrıştırılamadı. Lütfen geçerli bir TYT veya LGS belgesi yükleyin. Detay: {exc}")
 
         # ── 5. raw_extractions kaydı oluştur ──────────────────────────────
         raw_extraction = RawExtraction(

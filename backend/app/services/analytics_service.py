@@ -39,6 +39,7 @@ class AnalyticsService:
                 Exam.id.label("exam_id"),
                 Exam.name.label("exam_name"),
                 Exam.exam_date,
+                Exam.source_format,
                 Subject.name.label("subject_name"),
                 func.sum(Result.correct).label("total_correct"),
                 func.sum(Result.wrong).label("total_wrong"),
@@ -73,10 +74,11 @@ class AnalyticsService:
             total_w = row.total_wrong or 0
             total_q = row.total_q or 1  # 0'a bölme hatasına karşı
 
-            # Formül: Net = Doğru - (Yanlış / 4) (Şu an 4 yanlış 1 doğruyu götürür varsayımıyla,
-            # ancak biz basitçe TYT standardı olan 0.25 çarpanı kullanıyoruz.
-            # Gerçekte sınav tipine göre bu dinamik olmalı, Faz 0 için 0.25 sabitliyoruz).
-            net = total_c - (total_w * 0.25)
+            penalty = 0.25
+            if row.source_format and "LGS" in row.source_format.upper():
+                penalty = 1.0 / 3.0
+
+            net = total_c - (total_w * penalty)
             success_rate = (total_c / total_q) * 100.0
 
             exams_map[row.exam_id]["subjects"].append(
@@ -130,9 +132,9 @@ class AnalyticsService:
 
             results_computed.append(
                 {
-                    "subject_name": row.subject_name,
-                    "topic_name": row.topic_name,
-                    "outcome_description": row.outcome_description,
+                    "subject_name": row.subject_name or "Genel",
+                    "topic_name": row.topic_name or "Bilinmeyen Konu",
+                    "outcome_description": row.outcome_description or "Bilinmeyen Kazanım",
                     "total_correct": tc,
                     "total_questions": tq,
                     "success_rate": round(success_rate, 2),
@@ -244,8 +246,8 @@ class AnalyticsService:
                 at_risk.append(
                     {
                         "student_id": str(student.id),
-                        "full_name": student.full_name,
-                        "class_name": student.class_.name,
+                        "full_name": student.full_name or "Bilinmeyen Öğrenci",
+                        "class_name": student.class_.name if student.class_ else "Bilinmeyen Sınıf",
                         "avg_net": round(avg_net, 2),
                         "last_net": round(last_net, 2),
                         "drop_percent": round(drop_percent, 1),

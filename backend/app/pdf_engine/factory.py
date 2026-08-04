@@ -55,7 +55,9 @@ class ParserFactory:
                     return TYTParser(pdf_path)
 
                 # Hiçbirine uymuyorsa hata fırlat
-                raise ValueError("PDF formatı tanımlanamadı (LGS veya TYT işaretçileri bulunamadı).")
+                raise ValueError("Sınav türü belgeden anlaşılamadı. Lütfen geçerli bir TYT veya LGS belgesi yükleyin.")
 
+        except ValueError:
+            raise
         except Exception as e:
             raise ValueError(f"PDF analiz edilemedi: {e}")
